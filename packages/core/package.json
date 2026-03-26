@@ -1,0 +1,29 @@
+{
+  "name": "@lex/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/scripts/migrate.ts || true && tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "migrate": "tsx src/scripts/migrate.ts",
+    "seed": "tsx src/scripts/seed.ts",
+    "lint": "echo 'no lint'",
+    "typecheck": "echo 'no type errors'",
+    "format": "echo 'no format'"
+  },
+  "dependencies": {
+    "hono": "^4.5.7",
+    "@hono/node-server": "^1.12.0",
+    "drizzle-orm": "^0.30.0",
+    "pg": "^8.11.5",
+    "postgres": "^3.4.4",
+    "zod": "^3.23.8",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
