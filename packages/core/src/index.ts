@@ -14,6 +14,7 @@ import { modelsRouter } from './routes/models.js';
 import { filesRouter } from './routes/files.js';
 import { env } from './lib/env.js';
 import { terminalRouter } from './routes/terminal.js';
+import { automationsRouter } from './routes/automations.js';
 
 const app = new Hono();
 app.use('*', cors());
@@ -38,10 +39,7 @@ app.route('/api/settings', settingsRouter);
 app.route('/api/models', modelsRouter);
 app.route('/api/files', filesRouter);
 app.route('/api/terminal', terminalRouter);
-
-app.get('/api/automations', notImplemented);
-app.post('/api/automations', notImplemented);
-app.get('/api/automations/:id', notImplemented);
+app.route('/api/automations', automationsRouter);
 
 app.get('/api/sites', notImplemented);
 app.post('/api/sites', notImplemented);

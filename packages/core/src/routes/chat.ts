@@ -13,6 +13,10 @@ import { searchFilesTool } from '../tools/search_files.js';
 import { runCommand } from '../tools/run_command.js';
 import { runSequentialCommands } from '../tools/run_sequential_commands.js';
 import { runParallelCommands } from '../tools/run_parallel_commands.js';
+import { createAutomationTool } from '../tools/create_automation.js';
+import { editAutomationTool } from '../tools/edit_automation.js';
+import { deleteAutomationTool } from '../tools/delete_automation.js';
+import { listAutomationsTool } from '../tools/list_automations.js';
 
 export const chatRouter = new Hono();
 
@@ -99,6 +103,11 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     runCommand,
     runSequentialCommands,
     runParallelCommands,
+    // Automations tools
+    createAutomationTool,
+    editAutomationTool,
+    deleteAutomationTool,
+    listAutomationsTool,
   ];
 
   // persist user message

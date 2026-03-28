@@ -35,3 +35,24 @@ export async function streamChat(req: ChatRequest, onChunk: (chunk: string) => v
     onChunk(text);
   }
 }
+
+export async function chatCompletion(req: ChatRequest): Promise<any> {
+  const url = `${env.LITELLM_BASE_URL.replace(/\/$/, '')}/v1/chat/completions`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...req, stream: false }),
+    });
+    if (!res.ok) throw new Error(`LiteLLM error ${res.status}`);
+    const json = await res.json();
+    return json;
+  } catch (e) {
+    // Fallback mock
+    return {
+      choices: [
+        { message: { role: 'assistant', content: 'LiteLLM unavailable. This is a mock completion.', tool_calls: null } },
+      ],
+    };
+  }
+}
