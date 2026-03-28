@@ -16,7 +16,7 @@ async function main() {
   const client = new Client({ connectionString: url });
   await client.connect();
   const db = drizzle(client, { schema });
-  await db.execute('CREATE TABLE IF NOT EXISTS migrations (id text primary key, run_at timestamptz default now())');
+  await (db as any).execute('CREATE TABLE IF NOT EXISTS migrations (id text primary key, run_at timestamptz default now())');
 
   const dir = path.resolve(process.cwd(), 'packages/core/migrations');
   if (!fs.existsSync(dir)) {
