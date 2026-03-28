@@ -17,6 +17,9 @@ import { createAutomationTool } from '../tools/create_automation.js';
 import { editAutomationTool } from '../tools/edit_automation.js';
 import { deleteAutomationTool } from '../tools/delete_automation.js';
 import { listAutomationsTool } from '../tools/list_automations.js';
+import { createSiteTool } from '../tools/create_site.js';
+import { publishSiteTool, unpublishSiteTool } from '../tools/publish_site.js';
+import { registerServiceTool, updateServiceTool, deleteServiceTool, listServicesTool } from '../tools/services_tools.js';
 
 export const chatRouter = new Hono();
 
@@ -108,6 +111,14 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     editAutomationTool,
     deleteAutomationTool,
     listAutomationsTool,
+    // Phase 4 tools
+    createSiteTool,
+    publishSiteTool,
+    unpublishSiteTool,
+    registerServiceTool,
+    updateServiceTool,
+    deleteServiceTool,
+    listServicesTool,
   ];
 
   // persist user message

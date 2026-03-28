@@ -13,6 +13,9 @@ import { settingsRouter } from './routes/settings.js';
 import { modelsRouter } from './routes/models.js';
 import { filesRouter } from './routes/files.js';
 import { env } from './lib/env.js';
+import { sitesRouter } from './routes/sites.js';
+import { servicesRouter } from './routes/services.js';
+import { secretsRouter } from './routes/secrets.js';
 import { terminalRouter } from './routes/terminal.js';
 import { automationsRouter } from './routes/automations.js';
 
@@ -40,9 +43,9 @@ app.route('/api/models', modelsRouter);
 app.route('/api/files', filesRouter);
 app.route('/api/terminal', terminalRouter);
 app.route('/api/automations', automationsRouter);
-
-app.get('/api/sites', notImplemented);
-app.post('/api/sites', notImplemented);
+app.route('/api/sites', sitesRouter);
+app.route('/api/services', servicesRouter);
+app.route('/api/secrets', secretsRouter);
 
 app.get('/api/skills', notImplemented);
 app.get('/api/skills/hub', notImplemented);

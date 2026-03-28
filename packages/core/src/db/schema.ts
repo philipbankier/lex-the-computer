@@ -85,6 +85,7 @@ export const sites = pgTable('sites', {
   is_published: boolean('is_published').default(false).notNull(),
   custom_domain: varchar('custom_domain', { length: 255 }),
   port: integer('port'),
+  pid: integer('pid'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -136,3 +137,17 @@ export const datasets = pgTable('datasets', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Phase 4a: Services table
+export const services = pgTable('services', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 8 }).notNull(), // 'http' | 'tcp'
+  port: integer('port'),
+  entrypoint: text('entrypoint'),
+  working_dir: text('working_dir'),
+  env_vars: jsonb('env_vars'),
+  is_running: boolean('is_running').default(false).notNull(),
+  public_url: varchar('public_url', { length: 255 }),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});

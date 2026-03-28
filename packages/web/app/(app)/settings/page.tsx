@@ -67,13 +67,7 @@ export default function SettingsShell() {
 
       {tab === 'Advanced' && (
         <div className="grid gap-3">
-          <Section title="Secrets">
-            <div className="flex gap-2">
-              <input placeholder="KEY" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
-              <input placeholder="VALUE" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
-              <button className="px-2 py-1 text-sm rounded bg-white/10">Add</button>
-            </div>
-          </Section>
+          <SecretsSection />
           <Section title="Access Tokens">
             <div className="flex gap-2">
               <input placeholder="Name" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
@@ -186,6 +180,52 @@ function ProvidersSection() {
       <div className="flex gap-2 mt-2 flex-wrap">
         {rows.map((r) => (
           <span key={r.provider} className={`px-2 py-1 rounded ${r.configured ? 'bg-green-600/40' : 'bg-white/10'}`}>{r.provider} {r.configured ? '✓' : '—'}</span>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function SecretsSection() {
+  const [list, setList] = useState<{ key: string }[]>([]);
+  const [keyName, setKeyName] = useState('');
+  const [value, setValue] = useState('');
+  const [envText, setEnvText] = useState('');
+  useState(() => { void refresh(); });
+  async function refresh() { const r = await fetch(`${CORE_URL}/api/secrets`); const j = await r.json(); setList(j.secrets || []); }
+  async function add() { await fetch(`${CORE_URL}/api/secrets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: keyName, value }) }); setKeyName(''); setValue(''); await refresh(); }
+  async function remove(k: string) { await fetch(`${CORE_URL}/api/secrets/${encodeURIComponent(k)}`, { method: 'DELETE' }); await refresh(); }
+  async function pasteEnv() {
+    const lines = envText.split(/\r?\n/).filter(Boolean);
+    for (const ln of lines) {
+      const m = ln.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+      if (!m) continue;
+      const k = m[1];
+      const v = m[2].replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+      await fetch(`${CORE_URL}/api/secrets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k, value: v }) });
+    }
+    setEnvText(''); await refresh();
+  }
+  return (
+    <Section title="Secrets">
+      <div className="text-xs opacity-80 mb-2">Environment variables available to your sites and services</div>
+      <div className="flex gap-2 mb-2">
+        <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="KEY" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="VALUE" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+        <button onClick={add} className="px-2 py-1 text-sm rounded bg-white/10">Add</button>
+      </div>
+      <div className="flex gap-2 mb-2">
+        <textarea value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder={"Paste .env contents here"} className="w-full h-24 p-2 text-sm rounded bg-black/40 border border-white/10" />
+      </div>
+      <div className="flex gap-2 mb-2">
+        <button onClick={pasteEnv} className="px-2 py-1 text-sm rounded bg-white/10">Paste .env</button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {list.map((s) => (
+          <span key={s.key} className="px-2 py-1 rounded bg-white/10 text-sm">
+            {s.key}
+            <button onClick={() => remove(s.key)} className="ml-2 text-red-400">×</button>
+          </span>
         ))}
       </div>
     </Section>
