@@ -6,6 +6,13 @@ import { streamChat, type ChatMessage, type ToolSpec } from '../lib/litellm.js';
 import { webSearch } from '../tools/web_search.js';
 import { readWebpage } from '../tools/read_webpage.js';
 import { saveWebpage } from '../tools/save_webpage.js';
+import { createFile } from '../tools/create_file.js';
+import { editFile } from '../tools/edit_file.js';
+import { listFilesTool } from '../tools/list_files.js';
+import { searchFilesTool } from '../tools/search_files.js';
+import { runCommand } from '../tools/run_command.js';
+import { runSequentialCommands } from '../tools/run_sequential_commands.js';
+import { runParallelCommands } from '../tools/run_parallel_commands.js';
 
 export const chatRouter = new Hono();
 
@@ -81,7 +88,18 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
   const content: string = body.content || '';
   const model = body.model || convo.model || 'gpt-4o-mini';
   const fileSnippets: string[] = Array.isArray(body.fileSnippets) ? body.fileSnippets : [];
-  const toolsList = [webSearch, readWebpage, saveWebpage];
+  const toolsList = [
+    webSearch,
+    readWebpage,
+    saveWebpage,
+    createFile,
+    editFile,
+    listFilesTool,
+    searchFilesTool,
+    runCommand,
+    runSequentialCommands,
+    runParallelCommands,
+  ];
 
   // persist user message
   const [userMsg] = await db
