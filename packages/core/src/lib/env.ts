@@ -39,10 +39,14 @@ export const env = {
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
   // Phase 10: Advanced Features
-  // Image generation
+  // Image/Video generation (fal.ai)
+  FAL_KEY: process.env.FAL_KEY || '',
+  // Legacy image generation (kept for fallback)
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   STABILITY_API_KEY: process.env.STABILITY_API_KEY || '',
   REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || '',
+  // Transcription (Groq Whisper — 228x faster)
+  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
   // Google Maps
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
   // Airtable

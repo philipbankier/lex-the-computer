@@ -296,6 +296,20 @@ export const browser_sessions = pgTable('browser_sessions', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// AI Providers (Claude Code, Codex, Gemini CLI, BYOK, built-in)
+export const ai_providers = pgTable('ai_providers', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  type: varchar('type', { length: 32 }).notNull(), // 'builtin' | 'byok' | 'claude-code' | 'codex' | 'gemini-cli'
+  name: varchar('name', { length: 255 }).notNull(),
+  is_enabled: boolean('is_enabled').default(false).notNull(),
+  is_authenticated: boolean('is_authenticated').default(false).notNull(),
+  config: jsonb('config'), // provider-specific config (API keys for BYOK, model preferences, etc.)
+  default_model: text('default_model'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Phase 4a: Services table
 export const services = pgTable('services', {
   id: serial('id').primaryKey(),

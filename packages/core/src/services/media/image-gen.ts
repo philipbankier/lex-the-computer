@@ -1,27 +1,55 @@
 // Phase 10: Image Generation service
-// Supports OpenAI DALL-E 3, Stability AI, Replicate
+// Primary: fal.ai (FLUX.2, GPT Image, Recraft, Ideogram, Seedream)
+// Fallback: OpenAI DALL-E 3 (legacy)
 
 import { env } from '../../lib/env.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
+type ImageModel = 'flux-pro' | 'gpt-image' | 'recraft-v3' | 'ideogram-v3' | 'seedream' | 'nano-banana';
+
 type ImageOptions = {
+  model?: ImageModel;
   size?: string;
-  style?: 'natural' | 'vivid';
-  quality?: 'standard' | 'hd';
-  provider?: 'openai' | 'stability' | 'replicate';
+  style?: string;
 };
 
-function getProvider(preferred?: string): string {
-  if (preferred) {
-    if (preferred === 'openai' && env.OPENAI_API_KEY) return 'openai';
-    if (preferred === 'stability' && env.STABILITY_API_KEY) return 'stability';
-    if (preferred === 'replicate' && env.REPLICATE_API_TOKEN) return 'replicate';
+const FAL_MODEL_MAP: Record<ImageModel, string> = {
+  'flux-pro': 'fal-ai/flux-pro/v1.1',
+  'gpt-image': 'fal-ai/gpt-image',
+  'recraft-v3': 'fal-ai/recraft-v3',
+  'ideogram-v3': 'fal-ai/ideogram/v3',
+  'seedream': 'fal-ai/seedream-3',
+  'nano-banana': 'fal-ai/nano-banana-2',
+};
+
+async function generateWithFal(prompt: string, opts: ImageOptions): Promise<Buffer> {
+  const { fal } = await import('@fal-ai/client');
+  fal.config({ credentials: env.FAL_KEY });
+
+  const modelKey = opts.model || 'flux-pro';
+  const modelId = FAL_MODEL_MAP[modelKey];
+  if (!modelId) throw new Error(`Unknown fal.ai model: ${modelKey}`);
+
+  const input: Record<string, unknown> = { prompt };
+  if (opts.size) {
+    const [w, h] = opts.size.split('x').map(Number);
+    if (w && h) {
+      input.image_size = { width: w, height: h };
+    }
   }
-  if (env.OPENAI_API_KEY) return 'openai';
-  if (env.STABILITY_API_KEY) return 'stability';
-  if (env.REPLICATE_API_TOKEN) return 'replicate';
-  throw new Error('No image generation provider configured. Set OPENAI_API_KEY, STABILITY_API_KEY, or REPLICATE_API_TOKEN.');
+
+  const result = await fal.subscribe(modelId, { input }) as any;
+
+  // fal.ai returns images in result.data.images[0].url or result.images[0].url
+  const images = result?.data?.images || result?.images;
+  if (!images?.[0]?.url) {
+    throw new Error('fal.ai returned no image URL');
+  }
+
+  const imgRes = await fetch(images[0].url);
+  if (!imgRes.ok) throw new Error(`Failed to download fal.ai image: ${imgRes.status}`);
+  return Buffer.from(await imgRes.arrayBuffer());
 }
 
 async function generateWithOpenAI(prompt: string, opts: ImageOptions): Promise<Buffer> {
@@ -36,8 +64,7 @@ async function generateWithOpenAI(prompt: string, opts: ImageOptions): Promise<B
       prompt,
       n: 1,
       size: opts.size || '1024x1024',
-      style: opts.style || 'vivid',
-      quality: opts.quality || 'standard',
+      quality: 'standard',
       response_format: 'b64_json',
     }),
   });
@@ -46,81 +73,26 @@ async function generateWithOpenAI(prompt: string, opts: ImageOptions): Promise<B
   return Buffer.from(data.data[0].b64_json, 'base64');
 }
 
-async function generateWithStability(prompt: string, opts: ImageOptions): Promise<Buffer> {
-  const res = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.STABILITY_API_KEY}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      text_prompts: [{ text: prompt, weight: 1 }],
-      cfg_scale: 7,
-      width: 1024,
-      height: 1024,
-      steps: 30,
-      samples: 1,
-    }),
-  });
-  if (!res.ok) throw new Error(`Stability AI image gen failed: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return Buffer.from(data.artifacts[0].base64, 'base64');
-}
-
-async function generateWithReplicate(prompt: string): Promise<Buffer> {
-  // Create prediction
-  const createRes = await fetch('https://api.replicate.com/v1/predictions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Token ${env.REPLICATE_API_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      version: 'ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4', // SDXL
-      input: { prompt, width: 1024, height: 1024 },
-    }),
-  });
-  if (!createRes.ok) throw new Error(`Replicate image gen failed: ${createRes.status} ${await createRes.text()}`);
-  let prediction = await createRes.json();
-
-  // Poll for completion
-  for (let i = 0; i < 60; i++) {
-    if (prediction.status === 'succeeded') break;
-    if (prediction.status === 'failed') throw new Error(`Replicate prediction failed: ${prediction.error}`);
-    await new Promise(r => setTimeout(r, 2000));
-    const pollRes = await fetch(prediction.urls.get, {
-      headers: { Authorization: `Token ${env.REPLICATE_API_TOKEN}` },
-    });
-    prediction = await pollRes.json();
-  }
-
-  if (prediction.status !== 'succeeded') throw new Error('Replicate prediction timed out');
-  const imageUrl = prediction.output[0];
-  const imgRes = await fetch(imageUrl);
-  return Buffer.from(await imgRes.arrayBuffer());
-}
-
-export async function generateImage(prompt: string, opts: ImageOptions = {}): Promise<{ path: string; provider: string }> {
-  const provider = getProvider(opts.provider);
+export async function generateImage(prompt: string, opts: ImageOptions = {}): Promise<{ path: string; provider: string; model: string }> {
   let buffer: Buffer;
+  let provider: string;
+  let model: string;
 
-  switch (provider) {
-    case 'openai':
-      buffer = await generateWithOpenAI(prompt, opts);
-      break;
-    case 'stability':
-      buffer = await generateWithStability(prompt, opts);
-      break;
-    case 'replicate':
-      buffer = await generateWithReplicate(prompt);
-      break;
-    default:
-      throw new Error(`Unknown provider: ${provider}`);
+  if (env.FAL_KEY) {
+    const modelKey = opts.model || 'flux-pro';
+    buffer = await generateWithFal(prompt, opts);
+    provider = 'fal.ai';
+    model = modelKey;
+  } else if (env.OPENAI_API_KEY) {
+    buffer = await generateWithOpenAI(prompt, opts);
+    provider = 'openai';
+    model = 'dall-e-3';
+  } else {
+    throw new Error('No image generation provider configured. Set FAL_KEY (recommended) or OPENAI_API_KEY.');
   }
 
   const filename = `generated-${Date.now()}.png`;
   const filePath = path.join(env.WORKSPACE_DIR, 'files', filename);
   await fs.writeFile(filePath, buffer);
-  return { path: `files/${filename}`, provider };
+  return { path: `files/${filename}`, provider, model };
 }

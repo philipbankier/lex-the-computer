@@ -11,27 +11,28 @@ import { generateDiagram } from '../services/media/diagrams.js';
 // --- Image Generation ---
 export const generateImageTool: ToolDefinition<{
   prompt: string;
+  model?: string;
   size?: string;
-  style?: 'natural' | 'vivid';
-  provider?: 'openai' | 'stability' | 'replicate';
 }> = {
   name: 'generate_image',
-  description: 'Generate an image from a text prompt using DALL-E 3, Stability AI, or Replicate. The image is saved to the workspace.',
+  description: 'Generate an image from a text prompt using fal.ai (FLUX.2 Pro, GPT Image, Recraft V3, Ideogram V3, Seedream). The image is saved to the workspace.',
   parameters: {
     type: 'object',
     properties: {
       prompt: { type: 'string', description: 'Text description of the image to generate' },
+      model: {
+        type: 'string',
+        enum: ['flux-pro', 'gpt-image', 'recraft-v3', 'ideogram-v3', 'seedream', 'nano-banana'],
+        description: 'Model to use. flux-pro (default, best quality), gpt-image (OpenAI), recraft-v3 (text/vector), ideogram-v3, seedream (Google), nano-banana (Google fast)',
+      },
       size: { type: 'string', description: 'Image size (e.g. 1024x1024, 1792x1024). Default: 1024x1024' },
-      style: { type: 'string', enum: ['natural', 'vivid'], description: 'Image style (OpenAI only). Default: vivid' },
-      provider: { type: 'string', enum: ['openai', 'stability', 'replicate'], description: 'Provider to use (auto-detected if not specified)' },
     },
     required: ['prompt'],
   },
   async execute(params) {
     return generateImage(params.prompt, {
+      model: params.model as any,
       size: params.size,
-      style: params.style,
-      provider: params.provider,
     });
   },
 };
@@ -44,7 +45,7 @@ export const editImageTool: ToolDefinition<{
   factor?: number;
 }> = {
   name: 'edit_image',
-  description: 'Edit an image: AI-powered editing, background removal, or upscaling.',
+  description: 'Edit an image: AI-powered editing (via fal.ai), background removal, or upscaling.',
   parameters: {
     type: 'object',
     properties: {
@@ -74,7 +75,7 @@ export const transcribeAudioTool: ToolDefinition<{
   timestamps?: boolean;
 }> = {
   name: 'transcribe_audio',
-  description: 'Transcribe an audio file to text using OpenAI Whisper. Supports mp3, wav, m4a, ogg, flac, webm.',
+  description: 'Transcribe an audio file to text using Groq Whisper (228x real-time speed) or OpenAI Whisper. Supports mp3, wav, m4a, ogg, flac, webm.',
   parameters: {
     type: 'object',
     properties: {
@@ -93,7 +94,7 @@ export const transcribeVideoTool: ToolDefinition<{
   file_path: string;
 }> = {
   name: 'transcribe_video',
-  description: 'Transcribe a video file to text. Extracts audio via ffmpeg, then transcribes with Whisper. Returns timestamped segments.',
+  description: 'Transcribe a video file to text. Extracts audio via ffmpeg, then transcribes with Groq Whisper (or OpenAI Whisper fallback). Returns timestamped segments.',
   parameters: {
     type: 'object',
     properties: {
@@ -111,20 +112,26 @@ export const generateVideoTool: ToolDefinition<{
   image_path: string;
   prompt?: string;
   duration?: number;
+  model?: string;
 }> = {
   name: 'generate_video',
-  description: 'Generate a short video clip from an image using Replicate or Stability AI.',
+  description: 'Generate a short video clip from an image using fal.ai (Kling V2, Veo 3, Wan 2.1).',
   parameters: {
     type: 'object',
     properties: {
       image_path: { type: 'string', description: 'Path to source image in workspace' },
       prompt: { type: 'string', description: 'Optional prompt to guide video generation' },
       duration: { type: 'number', description: 'Duration in seconds (default ~2s)' },
+      model: {
+        type: 'string',
+        enum: ['kling', 'veo', 'wan'],
+        description: 'Video model: kling (default, Kling V2), veo (Google Veo 3), wan (Wan 2.1)',
+      },
     },
     required: ['image_path'],
   },
   async execute(params) {
-    return generateVideo(params.image_path, params.prompt, params.duration);
+    return generateVideo(params.image_path, params.prompt, params.duration, params.model as any);
   },
 };
 

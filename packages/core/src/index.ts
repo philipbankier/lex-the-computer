@@ -33,6 +33,7 @@ import { searchRouter } from './routes/search.js';
 import { sshRouter } from './routes/ssh.js';
 import { browserRouter } from './routes/browser.js';
 import { mcpRouter } from './routes/mcp.js';
+import { aiProvidersRouter } from './routes/ai-providers.js';
 import { registerAllChannels, initializeChannels } from './services/channels/index.js';
 
 const app = new Hono();
@@ -87,6 +88,7 @@ app.route('/api/search', searchRouter);
 app.route('/api/ssh', sshRouter);
 app.route('/api/browser', browserRouter);
 app.route('/mcp', mcpRouter);
+app.route('/api/ai-providers', aiProvidersRouter);
 
 async function ensureWorkspace() {
   const base = env.WORKSPACE_DIR;

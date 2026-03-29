@@ -1,93 +1,63 @@
 // Phase 10: Video Generation service
-// Generates short video clips from images using Replicate or Stability AI
+// Primary: fal.ai (Kling, Veo, Wan)
+// Fallback: none (legacy Replicate/Stability removed)
 
 import { env } from '../../lib/env.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
+type VideoModel = 'kling' | 'veo' | 'wan';
+
+type VideoOptions = {
+  model?: VideoModel;
+  prompt?: string;
+  duration?: number;
+};
+
+const FAL_VIDEO_MAP: Record<VideoModel, string> = {
+  'kling': 'fal-ai/kling-video/v2/master/image-to-video',
+  'veo': 'fal-ai/veo3',
+  'wan': 'fal-ai/wan/v2.1/image-to-video',
+};
+
 export async function generateVideo(
   imagePath: string,
   prompt?: string,
   duration?: number,
-): Promise<{ path: string }> {
+  model?: VideoModel,
+): Promise<{ path: string; provider: string; model: string }> {
+  if (!env.FAL_KEY) {
+    throw new Error('FAL_KEY is required for video generation. Set FAL_KEY in your environment.');
+  }
+
+  const { fal } = await import('@fal-ai/client');
+  fal.config({ credentials: env.FAL_KEY });
+
   const absPath = path.isAbsolute(imagePath) ? imagePath : path.join(env.WORKSPACE_DIR, imagePath);
   const imageData = await fs.readFile(absPath);
 
-  if (env.REPLICATE_API_TOKEN) {
-    // Use Stable Video Diffusion on Replicate
-    const createRes = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${env.REPLICATE_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        version: '3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438', // SVD-XT
-        input: {
-          input_image: `data:image/png;base64,${imageData.toString('base64')}`,
-          motion_bucket_id: 127,
-          fps: 7,
-          num_frames: duration ? Math.min(duration * 7, 25) : 14,
-        },
-      }),
-    });
-    if (!createRes.ok) throw new Error(`Replicate video gen failed: ${createRes.status} ${await createRes.text()}`);
-    let prediction = await createRes.json();
+  const imageUrl = await fal.storage.upload(new Blob([imageData], { type: 'image/png' }));
 
-    // Poll for completion (video gen can be slow)
-    for (let i = 0; i < 120; i++) {
-      if (prediction.status === 'succeeded') break;
-      if (prediction.status === 'failed') throw new Error(`Video generation failed: ${prediction.error}`);
-      await new Promise(r => setTimeout(r, 3000));
-      const pollRes = await fetch(prediction.urls.get, {
-        headers: { Authorization: `Token ${env.REPLICATE_API_TOKEN}` },
-      });
-      prediction = await pollRes.json();
-    }
-    if (prediction.status !== 'succeeded') throw new Error('Video generation timed out');
+  const modelKey = model || 'kling';
+  const modelId = FAL_VIDEO_MAP[modelKey];
+  if (!modelId) throw new Error(`Unknown video model: ${modelKey}`);
 
-    const videoUrl = prediction.output;
-    const vidRes = await fetch(videoUrl);
-    const buffer = Buffer.from(await vidRes.arrayBuffer());
-    const filename = `generated-${Date.now()}.mp4`;
-    const outPath = path.join(env.WORKSPACE_DIR, 'files', filename);
-    await fs.writeFile(outPath, buffer);
-    return { path: `files/${filename}` };
+  const input: Record<string, unknown> = { image_url: imageUrl };
+  if (prompt) input.prompt = prompt;
+  if (duration) input.duration = duration;
+
+  const result = await fal.subscribe(modelId, { input }) as any;
+
+  const video = result?.data?.video || result?.video;
+  if (!video?.url) {
+    throw new Error('fal.ai returned no video URL');
   }
 
-  if (env.STABILITY_API_KEY) {
-    const formData = new FormData();
-    formData.append('image', new Blob([imageData], { type: 'image/png' }), 'image.png');
-    if (prompt) formData.append('seed', '0');
-    formData.append('cfg_scale', '1.8');
-    formData.append('motion_bucket_id', '127');
-
-    const res = await fetch('https://api.stability.ai/v2beta/image-to-video', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.STABILITY_API_KEY}` },
-      body: formData,
-    });
-    if (!res.ok) throw new Error(`Stability video gen failed: ${res.status} ${await res.text()}`);
-    const data = await res.json();
-    const generationId = data.id;
-
-    // Poll for result
-    for (let i = 0; i < 120; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const pollRes = await fetch(`https://api.stability.ai/v2beta/image-to-video/result/${generationId}`, {
-        headers: { Authorization: `Bearer ${env.STABILITY_API_KEY}`, Accept: 'video/*' },
-      });
-      if (pollRes.status === 200) {
-        const buffer = Buffer.from(await pollRes.arrayBuffer());
-        const filename = `generated-${Date.now()}.mp4`;
-        const outPath = path.join(env.WORKSPACE_DIR, 'files', filename);
-        await fs.writeFile(outPath, buffer);
-        return { path: `files/${filename}` };
-      }
-      if (pollRes.status !== 202) throw new Error(`Video gen poll failed: ${pollRes.status}`);
-    }
-    throw new Error('Video generation timed out');
-  }
-
-  throw new Error('No video generation provider configured. Set REPLICATE_API_TOKEN or STABILITY_API_KEY.');
+  const vidRes = await fetch(video.url);
+  if (!vidRes.ok) throw new Error(`Failed to download fal.ai video: ${vidRes.status}`);
+  const buffer = Buffer.from(await vidRes.arrayBuffer());
+  const filename = `generated-${Date.now()}.mp4`;
+  const outPath = path.join(env.WORKSPACE_DIR, 'files', filename);
+  await fs.writeFile(outPath, buffer);
+  return { path: `files/${filename}`, provider: 'fal.ai', model: modelKey };
 }
