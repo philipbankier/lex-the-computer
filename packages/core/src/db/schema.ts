@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, timestamp, boolean, jsonb, integer, text } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, timestamp, boolean, jsonb, integer, text, bigint } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -9,6 +9,8 @@ export const users = pgTable('users', {
   avatar: text('avatar'),
   settings: jsonb('settings'),
   onboarding_completed: boolean('onboarding_completed').default(false).notNull(),
+  role: varchar('role', { length: 16 }).default('user').notNull(), // 'user' | 'admin'
+  is_disabled: boolean('is_disabled').default(false).notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -323,6 +325,88 @@ export const custom_domains = pgTable('custom_domains', {
   ssl_status: varchar('ssl_status', { length: 16 }).default('pending').notNull(), // 'pending' | 'active' | 'error'
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Phase 11: Stripe Connect Commerce
+export const stripe_accounts = pgTable('stripe_accounts', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  stripe_account_id: text('stripe_account_id').notNull(),
+  country: varchar('country', { length: 8 }),
+  onboarding_complete: boolean('onboarding_complete').default(false).notNull(),
+  charges_enabled: boolean('charges_enabled').default(false).notNull(),
+  payouts_enabled: boolean('payouts_enabled').default(false).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stripe_products = pgTable('stripe_products', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  stripe_product_id: text('stripe_product_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  active: boolean('active').default(true).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stripe_prices = pgTable('stripe_prices', {
+  id: serial('id').primaryKey(),
+  product_id: integer('product_id').notNull(),
+  stripe_price_id: text('stripe_price_id').notNull(),
+  amount: integer('amount').notNull(), // cents
+  currency: varchar('currency', { length: 8 }).default('usd').notNull(),
+  type: varchar('type', { length: 16 }).default('one_time').notNull(), // 'one_time' | 'recurring'
+  interval: varchar('interval', { length: 16 }), // 'month' | 'year' for recurring
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stripe_payment_links = pgTable('stripe_payment_links', {
+  id: serial('id').primaryKey(),
+  price_id: integer('price_id').notNull(),
+  stripe_payment_link_id: text('stripe_payment_link_id').notNull(),
+  url: text('url').notNull(),
+  active: boolean('active').default(true).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stripe_orders = pgTable('stripe_orders', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  stripe_session_id: text('stripe_session_id').notNull(),
+  product_name: text('product_name'),
+  amount: integer('amount'),
+  currency: varchar('currency', { length: 8 }),
+  customer_email: text('customer_email'),
+  payment_status: varchar('payment_status', { length: 16 }).default('pending').notNull(), // 'pending' | 'paid' | 'failed'
+  fulfillment_status: varchar('fulfillment_status', { length: 16 }).default('unfulfilled').notNull(), // 'unfulfilled' | 'fulfilled'
+  paid_at: timestamp('paid_at', { withTimezone: true }),
+  fulfilled_at: timestamp('fulfilled_at', { withTimezone: true }),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Phase 11: Multi-user container isolation
+export const user_containers = pgTable('user_containers', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  container_id: text('container_id'),
+  status: varchar('status', { length: 16 }).default('creating').notNull(), // 'creating' | 'running' | 'stopped' | 'error'
+  hostname: text('hostname'),
+  cpu_limit: varchar('cpu_limit', { length: 8 }).default('1').notNull(),
+  memory_limit: varchar('memory_limit', { length: 8 }).default('2g').notNull(),
+  storage_limit: varchar('storage_limit', { length: 8 }).default('10g').notNull(),
+  last_active_at: timestamp('last_active_at', { withTimezone: true }),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Phase 11: Usage metering
+export const usage_records = pgTable('usage_records', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  type: varchar('type', { length: 32 }).notNull(), // 'ai_tokens' | 'storage' | 'api_calls' | 'image_gen' | 'video_gen' | 'transcription'
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  metadata: jsonb('metadata'), // model, cost estimate, etc.
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Phase 4a: Services table

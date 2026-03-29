@@ -50,6 +50,11 @@ import {
   editFileLlmTool, changeHardwareTool, setActivePersonaTool, updateUserSettingsTool,
 } from '../tools/extra_tools.js';
 import { buildSkillsContext } from '../services/skill-loader.js';
+import {
+  createStripeProductTool, createStripePriceTool, createStripePaymentLinkTool,
+  updateStripePaymentLinkTool, updateStripeProductTool, listStripePaymentLinksTool,
+  listStripeOrdersTool, updateStripeOrdersTool,
+} from '../tools/stripe_tools.js';
 
 export const chatRouter = new Hono();
 
@@ -219,6 +224,15 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     changeHardwareTool,
     setActivePersonaTool,
     updateUserSettingsTool,
+    // Phase 11 Stripe Commerce tools
+    createStripeProductTool,
+    createStripePriceTool,
+    createStripePaymentLinkTool,
+    updateStripePaymentLinkTool,
+    updateStripeProductTool,
+    listStripePaymentLinksTool,
+    listStripeOrdersTool,
+    updateStripeOrdersTool,
   ];
 
   // persist user message

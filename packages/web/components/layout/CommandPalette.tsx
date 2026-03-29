@@ -27,6 +27,8 @@ const NAV_ITEMS: SearchResult[] = [
   { type: 'nav', title: 'Settings → AI', href: '/settings', subtitle: 'Models, Personas, Providers', icon: '🤖' },
   { type: 'nav', title: 'Settings → Channels', href: '/settings', subtitle: 'Telegram, Email, Discord', icon: '📡' },
   { type: 'nav', title: 'Settings → UX', href: '/settings', subtitle: 'Theme, Keybindings', icon: '🎨' },
+  { type: 'nav', title: 'Sell', href: '/sell', subtitle: 'Stripe Commerce, Products, Orders', icon: '💳' },
+  { type: 'nav', title: 'Admin', href: '/admin', subtitle: 'Users, Containers, System Stats', icon: '🛡️' },
 ];
 
 export function CommandPalette() {

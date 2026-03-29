@@ -57,4 +57,16 @@ export const env = {
   // Microsoft (OneDrive + Outlook)
   MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID || '',
   MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET || '',
+  // Phase 11: Stripe Connect
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID || '',
+  // Phase 11: Multi-user
+  MULTI_USER: process.env.MULTI_USER === 'true',
+  CONTAINER_IDLE_TIMEOUT: Number(process.env.CONTAINER_IDLE_TIMEOUT || '1800'),
+  CONTAINER_CPU_LIMIT: process.env.CONTAINER_CPU_LIMIT || '1',
+  CONTAINER_MEMORY_LIMIT: process.env.CONTAINER_MEMORY_LIMIT || '2g',
+  CONTAINER_STORAGE_LIMIT: process.env.CONTAINER_STORAGE_LIMIT || '10g',
+  // Phase 11: Admin
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@example.com',
 };

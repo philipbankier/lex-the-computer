@@ -35,12 +35,17 @@ import { browserRouter } from './routes/browser.js';
 import { mcpRouter } from './routes/mcp.js';
 import { aiProvidersRouter } from './routes/ai-providers.js';
 import { domainsRouter } from './routes/domains.js';
+import { sellRouter } from './routes/sell.js';
+import { adminRouter } from './routes/admin.js';
+import { healthRouter } from './routes/health.js';
 import { registerAllChannels, initializeChannels } from './services/channels/index.js';
+import { requestLogger } from './middleware/request-logger.js';
+import { rateLimiter } from './middleware/rate-limit.js';
 
 const app = new Hono();
 app.use('*', cors());
-
-app.get('/health', (c) => c.json({ ok: true }));
+app.use('*', requestLogger);
+app.use('/api/*', rateLimiter());
 
 // Helper to return 501
 const notImplemented = (c: Context) => c.json({ error: 'Not Implemented' }, 501);
@@ -91,6 +96,11 @@ app.route('/api/browser', browserRouter);
 app.route('/mcp', mcpRouter);
 app.route('/api/ai-providers', aiProvidersRouter);
 app.route('/api/domains', domainsRouter);
+
+// Phase 11: Commerce, Admin, Health
+app.route('/api/sell', sellRouter);
+app.route('/api/admin', adminRouter);
+app.route('/', healthRouter);
 
 async function ensureWorkspace() {
   const base = env.WORKSPACE_DIR;

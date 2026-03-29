@@ -13,12 +13,14 @@ const primary = [
 
 const more = [
   { title: 'Hosting', href: '/hosting' },
+  { title: 'Sell', href: '/sell' },
   { title: 'Datasets', href: '/datasets' },
   { title: 'System', href: '/system' },
   { title: 'Terminal', href: '/terminal' },
   { title: 'Billing', href: '/billing' },
   { title: 'Resources', href: '/resources' },
   { title: 'Bookmarks', href: '/bookmarks' },
+  { title: 'Admin', href: '/admin' },
   { title: 'Settings', href: '/settings' },
 ];
 
