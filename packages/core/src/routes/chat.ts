@@ -30,6 +30,10 @@ import {
   createSkillTool, listSkillsTool, getSkillTool, toggleSkillTool,
   installHubSkillTool, uninstallSkillTool, searchHubSkillsTool,
 } from '../tools/skills_tools.js';
+import {
+  useGmailTool, useCalendarTool, useNotionTool, useDriveTool,
+  useDropboxTool, useLinearTool, useGithubTool, listAppToolsTool,
+} from '../tools/integration_tools.js';
 import { buildSkillsContext } from '../services/skill-loader.js';
 
 export const chatRouter = new Hono();
@@ -154,6 +158,15 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     installHubSkillTool,
     uninstallSkillTool,
     searchHubSkillsTool,
+    // Phase 7 Integration tools
+    useGmailTool,
+    useCalendarTool,
+    useNotionTool,
+    useDriveTool,
+    useDropboxTool,
+    useLinearTool,
+    useGithubTool,
+    listAppToolsTool,
   ];
 
   // persist user message

@@ -41,9 +41,7 @@ export default function SettingsShell() {
 
       {tab === 'Integrations' && (
         <div className="grid gap-3">
-          <Section title="Connections">Connected integrations</Section>
-          <Section title="Browser">Browser integration</Section>
-          <Section title="Payments">Payments providers</Section>
+          <IntegrationsSection />
         </div>
       )}
 
@@ -68,12 +66,7 @@ export default function SettingsShell() {
       {tab === 'Advanced' && (
         <div className="grid gap-3">
           <SecretsSection />
-          <Section title="Access Tokens">
-            <div className="flex gap-2">
-              <input placeholder="Name" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
-              <button className="px-2 py-1 text-sm rounded bg-white/10">Create</button>
-            </div>
-          </Section>
+          <ApiKeysSection />
           <Section title="Danger Zone">
             <button className="px-2 py-1 text-sm rounded bg-red-600/80">Delete account</button>
           </Section>
@@ -180,6 +173,207 @@ function ProvidersSection() {
       <div className="flex gap-2 mt-2 flex-wrap">
         {rows.map((r) => (
           <span key={r.provider} className={`px-2 py-1 rounded ${r.configured ? 'bg-green-600/40' : 'bg-white/10'}`}>{r.provider} {r.configured ? '✓' : '—'}</span>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+const PROVIDER_INFO: Record<string, { name: string; icon: string; description: string }> = {
+  gmail: { name: 'Gmail', icon: '\u2709\uFE0F', description: 'Search, read, and send emails' },
+  'google-calendar': { name: 'Google Calendar', icon: '\uD83D\uDCC5', description: 'View and manage calendar events' },
+  'google-drive': { name: 'Google Drive', icon: '\uD83D\uDCC1', description: 'Search, download, and upload files' },
+  notion: { name: 'Notion', icon: '\uD83D\uDCD3', description: 'Search and manage pages and databases' },
+  dropbox: { name: 'Dropbox', icon: '\uD83D\uDCE6', description: 'Search, download, and upload files' },
+  linear: { name: 'Linear', icon: '\uD83D\uDCCB', description: 'Search and manage issues and projects' },
+  github: { name: 'GitHub', icon: '\uD83D\uDC19', description: 'Access repos, issues, and pull requests' },
+};
+
+function IntegrationsSection() {
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [providers, setProviders] = useState<any[]>([]);
+  const [notionToken, setNotionToken] = useState('');
+  const [showNotion, setShowNotion] = useState(false);
+  useState(() => { void refresh(); });
+
+  async function refresh() {
+    const [iRes, pRes] = await Promise.all([
+      fetch(`${CORE_URL}/api/integrations`),
+      fetch(`${CORE_URL}/api/integrations/providers`),
+    ]);
+    setIntegrations(await iRes.json());
+    setProviders(await pRes.json());
+  }
+
+  async function disconnect(id: number) {
+    if (!confirm('Disconnect this integration?')) return;
+    await fetch(`${CORE_URL}/api/integrations/${id}`, { method: 'DELETE' });
+    await refresh();
+  }
+
+  async function testConnection(id: number) {
+    const res = await fetch(`${CORE_URL}/api/integrations/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    alert(data.ok ? 'Connection works!' : `Connection failed: ${data.error}`);
+  }
+
+  async function connectOAuth(provider: string) {
+    window.open(`${CORE_URL}/api/integrations/${provider}/auth`, '_blank', 'width=600,height=700');
+    // Listen for completion message
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'integration-connected') {
+        window.removeEventListener('message', handler);
+        refresh();
+      }
+    };
+    window.addEventListener('message', handler);
+  }
+
+  async function connectNotion() {
+    if (!notionToken.trim()) return;
+    const res = await fetch(`${CORE_URL}/api/integrations/notion/connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: notionToken }),
+    });
+    const data = await res.json();
+    if (data.ok) { setNotionToken(''); setShowNotion(false); await refresh(); }
+    else alert(`Failed: ${data.error}`);
+  }
+
+  const connectedProviders = new Set(integrations.map((i: any) => i.provider));
+
+  return (
+    <>
+      <Section title="Connected Integrations">
+        {integrations.length === 0 && <div className="text-xs opacity-60">No integrations connected yet</div>}
+        <div className="grid gap-2">
+          {integrations.map((i: any) => {
+            const info = PROVIDER_INFO[i.provider] || { name: i.provider, icon: '\uD83D\uDD17', description: '' };
+            return (
+              <div key={i.id} className="flex items-center gap-3 p-2 rounded bg-white/5">
+                <span className="text-lg">{info.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{info.name}</div>
+                  <div className="text-xs opacity-60 truncate">{i.account_email || i.account_name || i.label}</div>
+                </div>
+                <span className={`px-1.5 py-0.5 text-xs rounded ${i.permission === 'read' ? 'bg-blue-600/40' : 'bg-green-600/40'}`}>
+                  {i.permission === 'read' ? 'Read Only' : 'Read & Write'}
+                </span>
+                <button onClick={() => testConnection(i.id)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">Test</button>
+                <button onClick={() => disconnect(i.id)} className="px-2 py-1 text-xs rounded bg-red-600/40 hover:bg-red-600/60">Disconnect</button>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section title="Available Integrations">
+        <div className="grid gap-2">
+          {providers.map((p: any) => {
+            const info = PROVIDER_INFO[p.provider] || { name: p.provider, icon: '\uD83D\uDD17', description: '' };
+            const isConnected = connectedProviders.has(p.provider);
+            return (
+              <div key={p.provider} className="flex items-center gap-3 p-2 rounded bg-white/5">
+                <span className="text-lg">{info.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{info.name}</div>
+                  <div className="text-xs opacity-60">{info.description}</div>
+                </div>
+                {p.provider === 'notion' ? (
+                  showNotion ? (
+                    <div className="flex gap-1">
+                      <input value={notionToken} onChange={(e) => setNotionToken(e.target.value)} placeholder="Integration token" className="px-2 py-1 text-xs rounded bg-black/40 border border-white/10 w-48" />
+                      <button onClick={connectNotion} className="px-2 py-1 text-xs rounded bg-white/10">Save</button>
+                      <button onClick={() => setShowNotion(false)} className="px-2 py-1 text-xs rounded bg-white/10">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowNotion(true)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">
+                      {isConnected ? '+ Add Another' : 'Connect'}
+                    </button>
+                  )
+                ) : !p.configured ? (
+                  <span className="text-xs opacity-40">Configure in .env</span>
+                ) : (
+                  <button onClick={() => connectOAuth(p.provider)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">
+                    {isConnected ? '+ Add Another' : 'Connect'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function ApiKeysSection() {
+  const [keys, setKeys] = useState<any[]>([]);
+  const [name, setName] = useState('');
+  const [newKey, setNewKey] = useState('');
+  useState(() => { void refresh(); });
+
+  async function refresh() {
+    const r = await fetch(`${CORE_URL}/api/api-keys`);
+    setKeys(await r.json());
+  }
+
+  async function create() {
+    if (!name.trim()) return;
+    const res = await fetch(`${CORE_URL}/api/api-keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (data.key) { setNewKey(data.key); setName(''); await refresh(); }
+  }
+
+  async function revoke(id: number) {
+    if (!confirm('Revoke this API key? This cannot be undone.')) return;
+    await fetch(`${CORE_URL}/api/api-keys/${id}`, { method: 'DELETE' });
+    await refresh();
+  }
+
+  async function toggle(id: number, active: boolean) {
+    await fetch(`${CORE_URL}/api/api-keys/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !active }),
+    });
+    await refresh();
+  }
+
+  return (
+    <Section title="API Keys">
+      <div className="text-xs opacity-80 mb-2">Use API keys to access Lex programmatically via the public REST API</div>
+      {newKey && (
+        <div className="p-2 mb-2 rounded bg-yellow-600/20 border border-yellow-500/30">
+          <div className="text-xs font-medium mb-1">New API Key (copy now — you won't see it again)</div>
+          <div className="flex gap-2">
+            <code className="flex-1 text-xs bg-black/40 p-1 rounded break-all">{newKey}</code>
+            <button onClick={() => { navigator.clipboard.writeText(newKey); }} className="px-2 py-1 text-xs rounded bg-white/10">Copy</button>
+            <button onClick={() => setNewKey('')} className="px-2 py-1 text-xs rounded bg-white/10">Dismiss</button>
+          </div>
+        </div>
+      )}
+      <div className="flex gap-2 mb-2">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Key name (e.g. My App)" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" onKeyDown={(e) => e.key === 'Enter' && create()} />
+        <button onClick={create} className="px-2 py-1 text-sm rounded bg-white/10">Create</button>
+      </div>
+      <div className="grid gap-1">
+        {keys.map((k: any) => (
+          <div key={k.id} className="flex items-center gap-2 p-1.5 rounded bg-white/5 text-sm">
+            <span className="font-medium">{k.name}</span>
+            <code className="text-xs opacity-60">{k.key_prefix}</code>
+            <span className="text-xs opacity-40">{k.last_used_at ? `Used ${new Date(k.last_used_at).toLocaleDateString()}` : 'Never used'}</span>
+            <div className="flex-1" />
+            <button onClick={() => toggle(k.id, k.is_active)} className={`px-1.5 py-0.5 text-xs rounded ${k.is_active ? 'bg-green-600/40' : 'bg-white/10'}`}>
+              {k.is_active ? 'Active' : 'Inactive'}
+            </button>
+            <button onClick={() => revoke(k.id)} className="px-1.5 py-0.5 text-xs rounded bg-red-600/40 hover:bg-red-600/60">Revoke</button>
+          </div>
         ))}
       </div>
     </Section>

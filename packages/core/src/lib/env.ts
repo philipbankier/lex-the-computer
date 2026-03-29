@@ -5,4 +5,21 @@ export const env = {
   LITELLM_BASE_URL: process.env.LITELLM_BASE_URL || process.env.LITELLM_URL || 'http://localhost:4000',
   WORKSPACE_DIR: process.env.WORKSPACE_DIR || path.resolve(process.cwd(), 'workspace'),
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  // Base URL for OAuth callbacks
+  BASE_URL: process.env.BASE_URL || 'http://localhost:3001',
+  // Google OAuth (shared across Gmail, Calendar, Drive)
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+  // Notion
+  NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID || '',
+  NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET || '',
+  // Dropbox
+  DROPBOX_CLIENT_ID: process.env.DROPBOX_CLIENT_ID || '',
+  DROPBOX_CLIENT_SECRET: process.env.DROPBOX_CLIENT_SECRET || '',
+  // Linear
+  LINEAR_CLIENT_ID: process.env.LINEAR_CLIENT_ID || '',
+  LINEAR_CLIENT_SECRET: process.env.LINEAR_CLIENT_SECRET || '',
+  // GitHub
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
 };

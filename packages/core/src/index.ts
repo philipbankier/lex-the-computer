@@ -20,6 +20,9 @@ import { terminalRouter } from './routes/terminal.js';
 import { automationsRouter } from './routes/automations.js';
 import { spaceRouter, spacePublicRouter } from './routes/space.js';
 import { skillsRouter } from './routes/skills.js';
+import { integrationsRouter } from './routes/integrations.js';
+import { apiKeysRouter } from './routes/api-keys.js';
+import { publicApiRouter } from './routes/public-api.js';
 import { seedHubSkills } from './services/seed-hub-skills.js';
 
 const app = new Hono();
@@ -54,6 +57,11 @@ app.route('/public/space', spacePublicRouter);
 app.route('/space', spacePublicRouter);
 
 app.route('/api/skills', skillsRouter);
+
+// Phase 7: Integrations & API
+app.route('/api/integrations', integrationsRouter);
+app.route('/api/api-keys', apiKeysRouter);
+app.route('/api/v1', publicApiRouter);
 
 app.get('/api/settings', notImplemented);
 app.put('/api/settings', notImplemented);

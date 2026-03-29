@@ -96,18 +96,26 @@ export const integrations = pgTable('integrations', {
   label: varchar('label', { length: 255 }),
   access_token: text('access_token'),
   refresh_token: text('refresh_token'),
-  scopes: text('scopes'),
-  permissions: jsonb('permissions'),
-  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  expires_at: timestamp('expires_at', { withTimezone: true }),
+  token_expires_at: timestamp('token_expires_at', { withTimezone: true }),
+  scope: text('scope'),
+  permission: varchar('permission', { length: 16 }).default('readwrite').notNull(),
+  account_email: text('account_email'),
+  account_name: text('account_name'),
+  account_avatar: text('account_avatar'),
+  is_active: boolean('is_active').default(true).notNull(),
+  connected_at: timestamp('connected_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const api_keys = pgTable('api_keys', {
   id: serial('id').primaryKey(),
   user_id: integer('user_id').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
   key_hash: text('key_hash').notNull(),
-  name: varchar('name', { length: 255 }),
-  last_used: timestamp('last_used', { withTimezone: true }),
+  key_prefix: varchar('key_prefix', { length: 16 }).notNull(),
+  last_used_at: timestamp('last_used_at', { withTimezone: true }),
+  expires_at: timestamp('expires_at', { withTimezone: true }),
+  is_active: boolean('is_active').default(true).notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
