@@ -3,13 +3,56 @@
 :root {
   --bg: #0b0b0c;
   --fg: #f5f5f7;
+  --card: #141416;
+  --card-fg: #f5f5f7;
+  --border: rgba(255,255,255,0.1);
+  --primary: #ffffff;
+  --primary-fg: #0b0b0c;
+  --secondary: rgba(255,255,255,0.1);
+  --secondary-fg: rgba(255,255,255,0.8);
+  --accent: #6366f1;
+  --accent-fg: #ffffff;
+  --muted: rgba(255,255,255,0.05);
+  --muted-fg: rgba(255,255,255,0.5);
+  --destructive: #ef4444;
+  --destructive-fg: #ffffff;
 }
 
 html, body, #__next {
   height: 100%;
 }
 
-body { background: var(--bg); color: var(--fg); }
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Fade-in animation for onboarding */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+
+/* Skeleton pulse */
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.15; }
+}
+.animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+/* Safe area for mobile bottom nav */
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+/* Mobile: add bottom padding to main content to avoid nav overlap */
+@media (max-width: 767px) {
+  main { padding-bottom: 4rem; }
+}
+
+/* Touch-friendly tap targets */
+@media (max-width: 767px) {
+  button, a, input, select, textarea { min-height: 44px; }
+}

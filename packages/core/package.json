@@ -19,6 +19,7 @@
     "discord.js": "^14.25.1",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.0",
+    "duckdb-async": "^1.4.2",
     "grammy": "^1.41.1",
     "hono": "^4.5.7",
     "ioredis": "^5.4.1",

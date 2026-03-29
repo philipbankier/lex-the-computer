@@ -25,6 +25,11 @@ import { apiKeysRouter } from './routes/api-keys.js';
 import { publicApiRouter } from './routes/public-api.js';
 import { seedHubSkills } from './services/seed-hub-skills.js';
 import { channelsRouter } from './routes/channels.js';
+import { onboardingRouter } from './routes/onboarding.js';
+import { datasetsRouter } from './routes/datasets.js';
+import { systemRouter } from './routes/system.js';
+import { notificationsRouter } from './routes/notifications.js';
+import { searchRouter } from './routes/search.js';
 import { registerAllChannels, initializeChannels } from './services/channels/index.js';
 
 const app = new Hono();
@@ -68,14 +73,16 @@ app.route('/api/v1', publicApiRouter);
 // Phase 8: Channels
 app.route('/api/channels', channelsRouter);
 
-app.get('/api/settings', notImplemented);
-app.put('/api/settings', notImplemented);
-
-app.get('/api/system/stats', notImplemented);
+// Phase 9: Onboarding & Polish
+app.route('/api/onboarding', onboardingRouter);
+app.route('/api/datasets', datasetsRouter);
+app.route('/api/system', systemRouter);
+app.route('/api/notifications', notificationsRouter);
+app.route('/api/search', searchRouter);
 
 async function ensureWorkspace() {
   const base = env.WORKSPACE_DIR;
-  const subdirs = ['files', 'sites', 'skills', 'articles', '.config', 'space-assets'];
+  const subdirs = ['files', 'sites', 'skills', 'articles', '.config', 'space-assets', 'datasets'];
   try {
     await fs.mkdir(base, { recursive: true });
     await Promise.all(subdirs.map((d) => fs.mkdir(path.join(base, d), { recursive: true })));

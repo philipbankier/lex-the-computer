@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { themes, applyTheme, getTheme } from '@/lib/themes';
 
 const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
 
@@ -45,16 +46,8 @@ export default function SettingsShell() {
 
       {tab === 'UX' && (
         <div className="grid gap-3">
-          <Section title="Theme">
-            <div className="flex gap-2">
-              <button className="px-2 py-1 text-sm rounded bg-white/10">Light</button>
-              <button className="px-2 py-1 text-sm rounded bg-white/10">Dark</button>
-              <button className="px-2 py-1 text-sm rounded bg-white/10">System</button>
-            </div>
-          </Section>
-          <Section title="Keybindings">
-            <button className="px-2 py-1 text-sm rounded bg-white/10">Open</button>
-          </Section>
+          <ThemeSection />
+          <KeybindingsSection />
           <Section title="Show hidden files">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" /> Toggle</label>
           </Section>
@@ -628,6 +621,72 @@ function SecretsSection() {
             {s.key}
             <button onClick={() => remove(s.key)} className="ml-2 text-red-400">×</button>
           </span>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function ThemeSection() {
+  const [active, setActive] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('lex-theme') || 'default';
+    return 'default';
+  });
+
+  function selectTheme(name: string) {
+    setActive(name);
+    if (name === 'default') {
+      applyTheme(null);
+      localStorage.setItem('lex-theme', 'default');
+    } else {
+      const t = getTheme(name);
+      if (t) { applyTheme(t); localStorage.setItem('lex-theme', name); }
+    }
+  }
+
+  return (
+    <Section title="Theme">
+      <div className="mb-3">
+        <button onClick={() => selectTheme('default')}
+          className={`px-3 py-1.5 text-sm rounded mr-2 ${active === 'default' ? 'bg-white/20 ring-1 ring-white/30' : 'bg-white/10'}`}>
+          Default Dark
+        </button>
+      </div>
+      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+        {themes.map((t) => (
+          <button key={t.name} onClick={() => selectTheme(t.name)}
+            className={`p-2 rounded-lg border text-left transition ${active === t.name ? 'border-white ring-1 ring-white/30' : 'border-white/10 hover:border-white/30'}`}>
+            <div className="flex gap-1 mb-1.5">
+              <div className="w-3 h-3 rounded-full" style={{ background: t.colors.bg }} />
+              <div className="w-3 h-3 rounded-full" style={{ background: t.colors.primary }} />
+              <div className="w-3 h-3 rounded-full" style={{ background: t.colors.accent }} />
+            </div>
+            <div className="text-xs font-medium truncate">{t.name}</div>
+            <div className="text-[10px] opacity-50">{t.mode}</div>
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+const DEFAULT_KEYBINDINGS = [
+  { action: 'Command Palette', shortcut: 'Ctrl+K', key: 'k' },
+  { action: 'New Conversation', shortcut: 'Ctrl+N', key: 'n' },
+  { action: 'Send Message', shortcut: 'Ctrl+Enter', key: 'Enter' },
+  { action: 'Toggle Sidebar', shortcut: 'Ctrl+/', key: '/' },
+  { action: 'Save', shortcut: 'Ctrl+S', key: 's' },
+];
+
+function KeybindingsSection() {
+  return (
+    <Section title="Keyboard Shortcuts">
+      <div className="space-y-1">
+        {DEFAULT_KEYBINDINGS.map((kb) => (
+          <div key={kb.action} className="flex items-center justify-between p-1.5 rounded hover:bg-white/5">
+            <span className="text-sm">{kb.action}</span>
+            <kbd className="px-2 py-0.5 text-xs rounded bg-white/10 font-mono">{kb.shortcut}</kbd>
+          </div>
         ))}
       </div>
     </Section>

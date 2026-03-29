@@ -8,6 +8,31 @@ export const users = pgTable('users', {
   bio: text('bio'),
   avatar: text('avatar'),
   settings: jsonb('settings'),
+  onboarding_completed: boolean('onboarding_completed').default(false).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Phase 9: User profiles for onboarding
+export const user_profiles = pgTable('user_profiles', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  display_name: varchar('display_name', { length: 255 }),
+  bio: text('bio'),
+  interests: jsonb('interests'), // string[]
+  social_links: jsonb('social_links'), // { twitter, github, linkedin, website }
+  avatar_url: text('avatar_url'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Phase 9: Notifications
+export const notifications = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  body: text('body'),
+  type: varchar('type', { length: 32 }).notNull(), // 'automation' | 'channel' | 'system'
+  read: boolean('read').default(false).notNull(),
+  link: text('link'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -166,8 +191,12 @@ export const datasets = pgTable('datasets', {
   user_id: integer('user_id').notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
-  path: text('path'),
+  source: text('source'),
+  schema_def: jsonb('schema_def'), // column definitions
+  row_count: integer('row_count'),
+  file_path: text('file_path').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Phase 5: Space tables
