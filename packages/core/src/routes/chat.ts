@@ -26,6 +26,11 @@ import {
   uploadSpaceAssetTool, deleteSpaceAssetTool, listSpaceAssetsTool,
   getSpaceErrorsTool, getSpaceSettingsTool, updateSpaceSettingsTool, restartSpaceServerTool,
 } from '../tools/space_tools.js';
+import {
+  createSkillTool, listSkillsTool, getSkillTool, toggleSkillTool,
+  installHubSkillTool, uninstallSkillTool, searchHubSkillsTool,
+} from '../tools/skills_tools.js';
+import { buildSkillsContext } from '../services/skill-loader.js';
 
 export const chatRouter = new Hono();
 
@@ -141,6 +146,14 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     getSpaceSettingsTool,
     updateSpaceSettingsTool,
     restartSpaceServerTool,
+    // Phase 6 Skills tools
+    createSkillTool,
+    listSkillsTool,
+    getSkillTool,
+    toggleSkillTool,
+    installHubSkillTool,
+    uninstallSkillTool,
+    searchHubSkillsTool,
   ];
 
   // persist user message
@@ -149,10 +162,14 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     .values({ conversation_id: id, role: 'user', content, model: null })
     .returning();
 
+  // Build skills context (progressive loading: summaries always, full content on match)
+  const skillsContext = await buildSkillsContext(userId, content);
+
   const systemPrompt = await buildSystemPrompt(userId, {
     personaId: convo.persona_id ?? undefined,
     tools: toolsList.map((t) => ({ name: t.name, description: t.description })),
     fileSnippets,
+    skillsContext,
   });
 
   const messages: ChatMessage[] = [

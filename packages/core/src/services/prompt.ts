@@ -1,6 +1,6 @@
 import { getDb, schema } from '../lib/db.js';
 
-export async function buildSystemPrompt(userId: number, opts?: { personaId?: number; tools?: { name: string; description?: string }[]; fileSnippets?: string[] }) {
+export async function buildSystemPrompt(userId: number, opts?: { personaId?: number; tools?: { name: string; description?: string }[]; fileSnippets?: string[]; skillsContext?: string }) {
   const db = await getDb();
   const [user] = await db.select().from(schema.users).where({ id: userId } as any).limit(1);
 
@@ -26,6 +26,7 @@ export async function buildSystemPrompt(userId: number, opts?: { personaId?: num
   if (personaPrompt) parts.push(`Persona:\n${personaPrompt}`);
   if (rulesPrompt) parts.push(`Rules:\n${rulesPrompt}`);
   if (toolsList) parts.push(`Available Tools:\n${toolsList}`);
+  if (opts?.skillsContext) parts.push(opts.skillsContext);
   if (files) parts.push(`Files:\n${files}`);
 
   return parts.join('\n\n');

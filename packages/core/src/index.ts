@@ -19,6 +19,8 @@ import { secretsRouter } from './routes/secrets.js';
 import { terminalRouter } from './routes/terminal.js';
 import { automationsRouter } from './routes/automations.js';
 import { spaceRouter, spacePublicRouter } from './routes/space.js';
+import { skillsRouter } from './routes/skills.js';
+import { seedHubSkills } from './services/seed-hub-skills.js';
 
 const app = new Hono();
 app.use('*', cors());
@@ -51,8 +53,7 @@ app.route('/api/space', spaceRouter);
 app.route('/public/space', spacePublicRouter);
 app.route('/space', spacePublicRouter);
 
-app.get('/api/skills', notImplemented);
-app.get('/api/skills/hub', notImplemented);
+app.route('/api/skills', skillsRouter);
 
 app.get('/api/settings', notImplemented);
 app.put('/api/settings', notImplemented);
@@ -71,7 +72,9 @@ async function ensureWorkspace() {
 }
 
 const port = Number(process.env.CORE_PORT || 3001);
-ensureWorkspace().finally(() => {
-  console.log(`Core API listening on http://localhost:${port}`);
-  serve({ fetch: app.fetch, port });
-});
+ensureWorkspace()
+  .then(() => seedHubSkills().catch(() => {}))
+  .finally(() => {
+    console.log(`Core API listening on http://localhost:${port}`);
+    serve({ fetch: app.fetch, port });
+  });

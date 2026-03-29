@@ -116,8 +116,33 @@ export const skills = pgTable('skills', {
   user_id: integer('user_id').notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  author: varchar('author', { length: 255 }),
+  version: varchar('version', { length: 64 }),
+  icon: text('icon'),
   directory: text('directory'),
+  source: varchar('source', { length: 16 }).default('local').notNull(), // 'local' | 'hub'
+  hub_id: integer('hub_id'),
+  is_active: boolean('is_active').default(true).notNull(),
+  installed_at: timestamp('installed_at', { withTimezone: true }).defaultNow().notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const skills_hub = pgTable('skills_hub', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  author: varchar('author', { length: 255 }),
+  version: varchar('version', { length: 64 }),
+  icon: text('icon'),
+  tags: text('tags'), // JSON array stored as text
+  repo_url: text('repo_url'),
+  download_url: text('download_url'),
+  downloads: integer('downloads').default(0).notNull(),
+  readme: text('readme'),
+  skill_md: text('skill_md'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const secrets = pgTable('secrets', {
