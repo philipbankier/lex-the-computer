@@ -17,6 +17,7 @@ import {
   uploadSpaceAssetTool, deleteSpaceAssetTool, listSpaceAssetsTool,
   getSpaceErrorsTool, getSpaceSettingsTool, updateSpaceSettingsTool, restartSpaceServerTool,
 } from '../tools/space_tools.js';
+import { getChannel } from './channels/index.js';
 
 const toolDefs = [
   webSearch,
@@ -119,6 +120,25 @@ export async function runAutomation(automationId: number) {
       .values({ user_id: userId, title: automation.name || 'Automation Run', model: automation.model || 'gpt-4o-mini', persona_id: null } as any)
       .returning();
     await db.insert(schema.messages).values({ conversation_id: conv.id, role: 'assistant', content: output, model: automation.model || 'gpt-4o-mini' } as any);
+
+    // Phase 8: Deliver via channels based on delivery field
+    // delivery can be: 'chat', 'email', 'telegram', 'discord', 'sms', or comma-separated
+    const deliveryMethods = (automation.delivery || 'chat').split(',').map((d: string) => d.trim());
+    for (const method of deliveryMethods) {
+      if (method === 'chat') continue; // Already delivered above
+      try {
+        const plugin = getChannel(method);
+        if (!plugin || !plugin.isConfigured()) continue;
+        // Find user's channel for this type
+        const userChannels = await db.select().from(schema.channels)
+          .where({ user_id: userId, type: method, is_active: true } as any);
+        for (const ch of userChannels) {
+          await plugin.sendMessage(ch.id, `[${automation.name}]\n\n${output}`);
+        }
+      } catch (err: any) {
+        console.error(`Automation delivery via ${method} failed:`, err?.message);
+      }
+    }
 
     // Update last_run
     await db.update(schema.automations).set({ last_run: new Date() } as any).where({ id: automationId } as any);

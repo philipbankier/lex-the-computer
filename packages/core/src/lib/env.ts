@@ -22,4 +22,20 @@ export const env = {
   // GitHub
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
+  // Phase 8: Channels
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+  DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN || '',
+  DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID || '',
+  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER || '', // 'cloudflare' | 'postal' | 'mailgun'
+  EMAIL_DOMAIN: process.env.EMAIL_DOMAIN || '',
+  EMAIL_API_KEY: process.env.EMAIL_API_KEY || '',
+  EMAIL_WEBHOOK_SECRET: process.env.EMAIL_WEBHOOK_SECRET || '',
+  // Postal-specific
+  POSTAL_API_URL: process.env.POSTAL_API_URL || '',
+  // Mailgun-specific
+  MAILGUN_DOMAIN: process.env.MAILGUN_DOMAIN || '',
+  // Twilio SMS
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
+  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
 };

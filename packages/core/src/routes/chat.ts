@@ -34,6 +34,9 @@ import {
   useGmailTool, useCalendarTool, useNotionTool, useDriveTool,
   useDropboxTool, useLinearTool, useGithubTool, listAppToolsTool,
 } from '../tools/integration_tools.js';
+import {
+  sendTelegramTool, sendEmailTool, sendDiscordTool, sendSmsTool,
+} from '../tools/channel_tools.js';
 import { buildSkillsContext } from '../services/skill-loader.js';
 
 export const chatRouter = new Hono();
@@ -167,6 +170,11 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     useLinearTool,
     useGithubTool,
     listAppToolsTool,
+    // Phase 8 Channel tools
+    sendTelegramTool,
+    sendEmailTool,
+    sendDiscordTool,
+    sendSmsTool,
   ];
 
   // persist user message

@@ -24,6 +24,8 @@ import { integrationsRouter } from './routes/integrations.js';
 import { apiKeysRouter } from './routes/api-keys.js';
 import { publicApiRouter } from './routes/public-api.js';
 import { seedHubSkills } from './services/seed-hub-skills.js';
+import { channelsRouter } from './routes/channels.js';
+import { registerAllChannels, initializeChannels } from './services/channels/index.js';
 
 const app = new Hono();
 app.use('*', cors());
@@ -63,6 +65,9 @@ app.route('/api/integrations', integrationsRouter);
 app.route('/api/api-keys', apiKeysRouter);
 app.route('/api/v1', publicApiRouter);
 
+// Phase 8: Channels
+app.route('/api/channels', channelsRouter);
+
 app.get('/api/settings', notImplemented);
 app.put('/api/settings', notImplemented);
 
@@ -80,8 +85,13 @@ async function ensureWorkspace() {
 }
 
 const port = Number(process.env.CORE_PORT || 3001);
+
+// Register all channel plugins
+registerAllChannels();
+
 ensureWorkspace()
   .then(() => seedHubSkills().catch(() => {}))
+  .then(() => initializeChannels().catch((err) => console.error('Channel init error:', err)))
   .finally(() => {
     console.log(`Core API listening on http://localhost:${port}`);
     serve({ fetch: app.fetch, port });

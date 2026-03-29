@@ -219,6 +219,28 @@ export const space_errors = pgTable('space_errors', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Phase 8: Channels tables
+export const channels = pgTable('channels', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  type: varchar('type', { length: 16 }).notNull(), // 'telegram' | 'email' | 'discord' | 'sms'
+  config: jsonb('config').notNull(), // provider-specific: chat_id, email address, discord user id, phone number, etc.
+  persona_id: integer('persona_id'),
+  is_active: boolean('is_active').default(true).notNull(),
+  paired_at: timestamp('paired_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const channel_messages = pgTable('channel_messages', {
+  id: serial('id').primaryKey(),
+  channel_id: integer('channel_id').notNull(),
+  direction: varchar('direction', { length: 8 }).notNull(), // 'inbound' | 'outbound'
+  external_id: text('external_id'),
+  content: text('content'),
+  conversation_id: integer('conversation_id'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Phase 4a: Services table
 export const services = pgTable('services', {
   id: serial('id').primaryKey(),

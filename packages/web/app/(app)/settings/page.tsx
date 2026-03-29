@@ -33,9 +33,7 @@ export default function SettingsShell() {
 
       {tab === 'Channels' && (
         <div className="grid gap-3">
-          <Section title="Text">Text channel config</Section>
-          <Section title="Email">Email channel config</Section>
-          <Section title="Telegram">Telegram config</Section>
+          <ChannelsSection />
         </div>
       )}
 
@@ -304,6 +302,216 @@ function IntegrationsSection() {
           })}
         </div>
       </Section>
+    </>
+  );
+}
+
+// ─── Phase 8: Channels Section ──────────────────────────────────────
+
+const CHANNEL_INFO: Record<string, { name: string; icon: string; description: string }> = {
+  telegram: { name: 'Telegram', icon: '\u2708\uFE0F', description: 'Chat with your AI via Telegram bot' },
+  email: { name: 'Email', icon: '\u2709\uFE0F', description: 'Send emails to your AI and get replies' },
+  discord: { name: 'Discord', icon: '\uD83C\uDFAE', description: 'Chat with your AI via Discord DMs' },
+  sms: { name: 'SMS', icon: '\uD83D\uDCF1', description: 'Text your AI via SMS (Twilio)' },
+};
+
+function ChannelsSection() {
+  const [channels, setChannels] = useState<any[]>([]);
+  const [available, setAvailable] = useState<any[]>([]);
+  const [personas, setPersonas] = useState<any[]>([]);
+  const [pairingState, setPairingState] = useState<{ type: string; code?: string; inviteUrl?: string; email?: string; instructions?: string } | null>(null);
+  const [smsPhone, setSmsPhone] = useState('');
+  const [smsCode, setSmsCode] = useState('');
+  const [smsPairing, setSmsPairing] = useState(false);
+
+  useState(() => { void refresh(); });
+
+  async function refresh() {
+    const [chRes, avRes, pRes] = await Promise.all([
+      fetch(`${CORE_URL}/api/channels`),
+      fetch(`${CORE_URL}/api/channels/available`),
+      fetch(`${CORE_URL}/api/personas`),
+    ]);
+    setChannels(await chRes.json());
+    setAvailable(await avRes.json());
+    setPersonas(await pRes.json());
+  }
+
+  async function startPairing(type: string) {
+    const res = await fetch(`${CORE_URL}/api/channels/${type}/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    const data = await res.json();
+    setPairingState({ type, ...data });
+  }
+
+  async function startSmsPairing() {
+    if (!smsPhone.trim()) return;
+    const res = await fetch(`${CORE_URL}/api/channels/sms/pair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: smsPhone }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    setSmsPairing(true);
+  }
+
+  async function verifySms() {
+    const res = await fetch(`${CORE_URL}/api/channels/sms/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: smsPhone, code: smsCode }),
+    });
+    const data = await res.json();
+    if (data.ok) { setSmsPairing(false); setSmsPhone(''); setSmsCode(''); await refresh(); }
+    else alert(data.error || 'Verification failed');
+  }
+
+  async function disconnect(id: number) {
+    if (!confirm('Disconnect this channel?')) return;
+    await fetch(`${CORE_URL}/api/channels/${id}`, { method: 'DELETE' });
+    await refresh();
+  }
+
+  async function testChannel(id: number) {
+    const res = await fetch(`${CORE_URL}/api/channels/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    alert(data.ok ? 'Test message sent!' : `Test failed: ${data.error}`);
+  }
+
+  async function updatePersona(id: number, personaId: number | null) {
+    await fetch(`${CORE_URL}/api/channels/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona_id: personaId }),
+    });
+    await refresh();
+  }
+
+  async function toggleActive(id: number, active: boolean) {
+    await fetch(`${CORE_URL}/api/channels/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !active }),
+    });
+    await refresh();
+  }
+
+  const connectedTypes = new Set(channels.map((c: any) => c.type));
+
+  return (
+    <>
+      {/* Connected Channels */}
+      {channels.length > 0 && (
+        <Section title="Connected Channels">
+          <div className="grid gap-2">
+            {channels.map((ch: any) => {
+              const info = CHANNEL_INFO[ch.type] || { name: ch.type, icon: '\uD83D\uDD17', description: '' };
+              return (
+                <div key={ch.id} className="p-2 rounded bg-white/5 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{info.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{info.name}</div>
+                      <div className="text-xs opacity-60 truncate">
+                        {ch.config?.username || ch.config?.email || ch.config?.phone || 'Connected'}
+                      </div>
+                    </div>
+                    <button onClick={() => toggleActive(ch.id, ch.is_active)} className={`px-1.5 py-0.5 text-xs rounded ${ch.is_active ? 'bg-green-600/40' : 'bg-white/10'}`}>
+                      {ch.is_active ? 'Active' : 'Paused'}
+                    </button>
+                    <button onClick={() => testChannel(ch.id)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">Test</button>
+                    <button onClick={() => disconnect(ch.id)} className="px-2 py-1 text-xs rounded bg-red-600/40 hover:bg-red-600/60">Disconnect</button>
+                  </div>
+                  {/* Per-channel persona */}
+                  <div className="flex items-center gap-2 ml-8">
+                    <span className="text-xs opacity-60">Persona:</span>
+                    <select
+                      value={ch.persona_id || ''}
+                      onChange={(e) => updatePersona(ch.id, e.target.value ? Number(e.target.value) : null)}
+                      className="px-2 py-0.5 text-xs rounded bg-black/40 border border-white/10"
+                    >
+                      <option value="">Use default</option>
+                      {personas.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs opacity-40">How the AI responds on this channel</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* Available Channels */}
+      <Section title="Available Channels">
+        <div className="grid gap-2">
+          {available.map((av: any) => {
+            const info = CHANNEL_INFO[av.type] || { name: av.type, icon: '\uD83D\uDD17', description: '' };
+            const isConnected = connectedTypes.has(av.type);
+            return (
+              <div key={av.type} className="p-2 rounded bg-white/5">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{info.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{info.name}</div>
+                    <div className="text-xs opacity-60">{info.description}</div>
+                  </div>
+                  {!av.configured ? (
+                    <span className="text-xs opacity-40">Set {av.envHint} in .env</span>
+                  ) : isConnected ? (
+                    <span className="px-2 py-0.5 text-xs rounded bg-green-600/40">Connected</span>
+                  ) : av.type === 'sms' ? (
+                    <button onClick={() => setSmsPairing(true)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">Connect</button>
+                  ) : (
+                    <button onClick={() => startPairing(av.type)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">Connect</button>
+                  )}
+                </div>
+
+                {/* Pairing flow for Telegram/Discord */}
+                {pairingState && pairingState.type === av.type && (av.type === 'telegram' || av.type === 'discord') && (
+                  <div className="mt-2 p-2 rounded bg-black/30 border border-white/10 text-xs space-y-1">
+                    <div className="font-medium">Pairing Code: <code className="bg-white/10 px-1 py-0.5 rounded">{pairingState.code}</code></div>
+                    <div className="opacity-60">{pairingState.instructions}</div>
+                    {pairingState.inviteUrl && (
+                      <div><a href={pairingState.inviteUrl} target="_blank" rel="noreferrer" className="text-blue-400 underline">Add bot to server</a></div>
+                    )}
+                    <div className="opacity-40">Expires in 10 minutes</div>
+                    <button onClick={() => { setPairingState(null); refresh(); }} className="px-2 py-1 rounded bg-white/10">Done</button>
+                  </div>
+                )}
+
+                {/* Email auto-setup info */}
+                {pairingState && pairingState.type === 'email' && av.type === 'email' && (
+                  <div className="mt-2 p-2 rounded bg-black/30 border border-white/10 text-xs space-y-1">
+                    <div className="font-medium">Your email: <code className="bg-white/10 px-1 py-0.5 rounded">{pairingState.email}</code></div>
+                    <div className="opacity-60">{pairingState.instructions}</div>
+                    <button onClick={() => { setPairingState(null); refresh(); }} className="px-2 py-1 rounded bg-white/10">Done</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* SMS Pairing Flow */}
+      {smsPairing && (
+        <Section title="Connect Phone Number">
+          <div className="space-y-2 text-sm">
+            <div className="flex gap-2">
+              <input value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} placeholder="+1234567890" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+              <button onClick={startSmsPairing} className="px-2 py-1 text-sm rounded bg-white/10">Send Code</button>
+            </div>
+            <div className="flex gap-2">
+              <input value={smsCode} onChange={(e) => setSmsCode(e.target.value)} placeholder="Verification code" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+              <button onClick={verifySms} className="px-2 py-1 text-sm rounded bg-white/10">Verify</button>
+              <button onClick={() => { setSmsPairing(false); setSmsPhone(''); setSmsCode(''); }} className="px-2 py-1 text-sm rounded bg-white/10">Cancel</button>
+            </div>
+          </div>
+        </Section>
+      )}
     </>
   );
 }
