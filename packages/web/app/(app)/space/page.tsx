@@ -255,39 +255,18 @@ export default function SpacePage() {
 
         {/* Editor tab */}
         {tab === 'editor' && (
-          <div className="flex-1 flex flex-col">
-            {selected ? (
-              <>
-                {/* Toolbar */}
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
-                  <span className="text-sm font-medium">{selected.path}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${selected.type === 'api' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}`}>{selected.type}</span>
-                  <div className="flex-1" />
-                  <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={undoRoute} title="Undo">Undo</button>
-                  <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={redoRoute} title="Redo">Redo</button>
-                  <button className={`text-xs px-2 py-1 rounded ${selected.is_public ? 'bg-green-500/20 text-green-300' : 'bg-white/10'}`} onClick={togglePublic}>
-                    {selected.is_public ? 'Public' : 'Private'}
-                  </button>
-                  {spaceUrl && selected.is_public && (
-                    <a href={`${CORE_URL}${spaceUrl}${selected.path === '/' ? '' : selected.path}`} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-1 bg-white/10 rounded">Preview</a>
-                  )}
-                  <button className={`text-xs px-2 py-1 rounded ${dirty ? 'bg-white text-black' : 'bg-white/10'}`} onClick={saveCode} disabled={!dirty}>Save</button>
-                  <button className="text-xs px-2 py-1 bg-red-500/20 text-red-300 rounded" onClick={deleteRoute}>Delete</button>
-                </div>
-                {/* Code editor (textarea fallback — Monaco can be added later) */}
-                <textarea
-                  className="flex-1 w-full p-4 bg-black/30 font-mono text-sm resize-none focus:outline-none"
-                  value={code}
-                  onChange={(e) => { setCode(e.target.value); setDirty(true); }}
-                  spellCheck={false}
-                />
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-sm opacity-40">
-                Select a route or create a new one
-              </div>
-            )}
-          </div>
+          <EditorPane
+            selected={selected}
+            code={code}
+            setCode={(v: string) => { setCode(v); setDirty(true); }}
+            dirty={dirty}
+            spaceUrl={spaceUrl}
+            onUndo={undoRoute}
+            onRedo={redoRoute}
+            onTogglePublic={togglePublic}
+            onSave={saveCode}
+            onDelete={deleteRoute}
+          />
         )}
 
         {/* History tab */}
@@ -396,6 +375,8 @@ export default function SpacePage() {
         )}
       </div>
 
+      {/* Editor Pane is rendered above */}
+
       {/* New route modal */}
       {showNew && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
@@ -417,6 +398,92 @@ export default function SpacePage() {
               <button className="px-3 py-1.5 bg-white text-black rounded text-sm" onClick={createRoute}>Create</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Editor Pane with Preview / Code toggle ──────────────────────────
+
+function EditorPane({ selected, code, setCode, dirty, spaceUrl, onUndo, onRedo, onTogglePublic, onSave, onDelete }: {
+  selected: SpaceRoute | null;
+  code: string;
+  setCode: (v: string) => void;
+  dirty: boolean;
+  spaceUrl: string | null;
+  onUndo: () => void;
+  onRedo: () => void;
+  onTogglePublic: () => void;
+  onSave: () => void;
+  onDelete: () => void;
+}) {
+  const [view, setView] = useState<'code' | 'preview'>('code');
+
+  if (!selected) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-sm opacity-40">
+        Select a route or create a new one
+      </div>
+    );
+  }
+
+  const previewUrl = spaceUrl ? `${CORE_URL}${spaceUrl}${selected.path === '/' ? '' : selected.path}` : null;
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
+        {/* URL bar */}
+        {spaceUrl && (
+          <div className="text-xs opacity-40 bg-black/30 px-2 py-1 rounded font-mono truncate max-w-[200px]">
+            {spaceUrl}{selected.path === '/' ? '' : selected.path}
+          </div>
+        )}
+        <span className="text-sm font-medium">{selected.path}</span>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded ${selected.type === 'api' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}`}>{selected.type}</span>
+
+        {/* Preview / Code toggle */}
+        <div className="flex bg-white/5 rounded overflow-hidden ml-2">
+          <button className={`px-2.5 py-1 text-xs ${view === 'preview' ? 'bg-white/15 font-medium' : 'hover:bg-white/10'}`} onClick={() => setView('preview')}>Preview</button>
+          <button className={`px-2.5 py-1 text-xs ${view === 'code' ? 'bg-white/15 font-medium' : 'hover:bg-white/10'}`} onClick={() => setView('code')}>Code</button>
+        </div>
+
+        <div className="flex-1" />
+        <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={onUndo} title="Undo">Undo</button>
+        <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={onRedo} title="Redo">Redo</button>
+
+        {/* Public toggle switch */}
+        <button className={`text-xs px-2.5 py-1 rounded flex items-center gap-1.5 ${selected.is_public ? 'bg-green-500/20 text-green-300' : 'bg-white/10'}`} onClick={onTogglePublic}>
+          <span className={`w-2 h-2 rounded-full ${selected.is_public ? 'bg-green-400' : 'bg-white/30'}`} />
+          {selected.is_public ? 'Public' : 'Private'}
+        </button>
+
+        {previewUrl && selected.is_public && (
+          <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-xs px-2 py-1 bg-white/10 rounded" title="Open in new tab">&#x2197;</a>
+        )}
+        <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={() => view === 'preview' && previewUrl ? window.open(previewUrl) : null} title="Refresh preview">&#x21BB;</button>
+        <button className={`text-xs px-2 py-1 rounded ${dirty ? 'bg-white text-black' : 'bg-white/10'}`} onClick={onSave} disabled={!dirty}>Save</button>
+        <button className="text-xs px-2 py-1 bg-red-500/20 text-red-300 rounded" onClick={onDelete}>Delete</button>
+      </div>
+
+      {/* Content area */}
+      {view === 'code' ? (
+        <textarea
+          className="flex-1 w-full p-4 bg-black/30 font-mono text-sm resize-none focus:outline-none"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          spellCheck={false}
+        />
+      ) : (
+        <div className="flex-1 bg-white">
+          {previewUrl && selected.is_public ? (
+            <iframe src={previewUrl} className="w-full h-full border-0" title="Preview" />
+          ) : (
+            <div className="flex items-center justify-center h-full text-black/40 text-sm">
+              {!selected.is_public ? 'Make the route public to see a preview' : 'Save and publish to preview'}
+            </div>
+          )}
         </div>
       )}
     </div>

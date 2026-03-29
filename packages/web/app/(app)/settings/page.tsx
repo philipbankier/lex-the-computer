@@ -22,28 +22,11 @@ export default function SettingsShell() {
         ))}
       </div>
 
-      {tab === 'AI' && (
-        <div className="grid gap-3">
-          <ModelsSection />
-          <PersonasSection />
-          <ProvidersSection />
-          <ProfileSection />
-          <RulesSection />
-          <BrowserSection />
-        </div>
-      )}
+      {tab === 'AI' && <AISettingsTab />}
 
-      {tab === 'Channels' && (
-        <div className="grid gap-3">
-          <ChannelsSection />
-        </div>
-      )}
+      {tab === 'Channels' && <ChannelsTab />}
 
-      {tab === 'Integrations' && (
-        <div className="grid gap-3">
-          <IntegrationsSection />
-        </div>
-      )}
+      {tab === 'Integrations' && <IntegrationsTab />}
 
       {tab === 'UX' && (
         <div className="grid gap-3">
@@ -70,15 +53,134 @@ export default function SettingsShell() {
   );
 }
 
+// ─── AI Settings Tab with sub-nav ──────────────────────────────────
+function AISettingsTab() {
+  const subs = ['Models', 'Personas', 'Providers', 'Personalization', 'Rules'] as const;
+  const [sub, setSub] = useState<typeof subs[number]>('Models');
+  return (
+    <div className="flex gap-6">
+      <div className="w-40 shrink-0 space-y-1">
+        {subs.map((s) => (
+          <button key={s} onClick={() => setSub(s)} className={`w-full text-left px-3 py-1.5 rounded text-sm ${sub === s ? 'bg-white/15 font-medium' : 'hover:bg-white/5'}`}>{s}</button>
+        ))}
+      </div>
+      <div className="flex-1 grid gap-3">
+        {sub === 'Models' && <ModelsSection />}
+        {sub === 'Personas' && <PersonasSection />}
+        {sub === 'Providers' && <ProvidersSection />}
+        {sub === 'Personalization' && <PersonalizationSection />}
+        {sub === 'Rules' && <RulesSection />}
+      </div>
+    </div>
+  );
+}
+
+// ─── Integrations Tab with sub-tabs ──────────────────────────────────
+function IntegrationsTab() {
+  const subs = ['Connections', 'Browser', 'Payments'] as const;
+  const [sub, setSub] = useState<typeof subs[number]>('Connections');
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 border-b border-white/10 pb-2">
+        {subs.map((s) => (
+          <button key={s} onClick={() => setSub(s)} className={`px-3 py-1.5 text-sm rounded-t ${sub === s ? 'bg-white/10 font-medium' : 'hover:bg-white/5'}`}>{s}</button>
+        ))}
+      </div>
+      {sub === 'Connections' && <div className="grid gap-3"><IntegrationsSection /></div>}
+      {sub === 'Browser' && <div className="grid gap-3"><BrowserSection /></div>}
+      {sub === 'Payments' && <div className="grid gap-3"><PaymentsSection /></div>}
+    </div>
+  );
+}
+
+function PaymentsSection() {
+  return (
+    <Section title="Payments (Stripe Connect)">
+      <div className="text-xs opacity-80 mb-2">Connect your Stripe account to sell products and services with 0% platform fee</div>
+      <a href={`${CORE_URL}/api/sell/connect`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-sm rounded bg-white/10 hover:bg-white/20 inline-block">Connect Stripe Account</a>
+    </Section>
+  );
+}
+
+// ─── Channels Tab with new UX pattern ──────────────────────────────────
+function ChannelsTab() {
+  return (
+    <div className="grid gap-3">
+      <ChannelsSection />
+    </div>
+  );
+}
+
+const CHANNEL_TYPES_FOR_CONFIG = [
+  { type: 'chat', name: 'Chat', icon: '\uD83D\uDCAC', detail: 'Web chat interface' },
+  { type: 'text', name: 'Text', icon: '\uD83D\uDCF1', detail: 'SMS / phone number' },
+  { type: 'email', name: 'Email', icon: '\u2709\uFE0F', detail: 'Email channel' },
+  { type: 'telegram', name: 'Telegram', icon: '\u2708\uFE0F', detail: 'Telegram bot' },
+  { type: 'discord', name: 'Discord', icon: '\uD83C\uDFAE', detail: 'Discord bot' },
+];
+
 function ModelsSection() {
   const [models, setModels] = useState<any[]>([]);
-  useState(() => { void fetch(`${CORE_URL}/api/models`).then((r) => r.json()).then((j) => setModels(j.data || [])); });
+  const [personas, setPersonas] = useState<any[]>([]);
+  const [configs, setConfigs] = useState<any[]>([]);
+
+  useState(() => {
+    void Promise.all([
+      fetch(`${CORE_URL}/api/models`).then((r) => r.json()).then((j) => setModels(j.data || [])),
+      fetch(`${CORE_URL}/api/personas`).then((r) => r.json()).then((j) => setPersonas(j || [])),
+      fetch(`${CORE_URL}/api/channel-configs`).then((r) => r.json()).then((j) => setConfigs(j || [])),
+    ]);
+  });
+
+  function getConfig(channelType: string) {
+    return configs.find((c: any) => c.channel_type === channelType) || {};
+  }
+
+  async function updateConfig(channelType: string, field: string, value: string | number | null) {
+    const res = await fetch(`${CORE_URL}/api/channel-configs/${channelType}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    });
+    const updated = await res.json();
+    setConfigs((prev) => {
+      const filtered = prev.filter((c: any) => c.channel_type !== channelType);
+      return [...filtered, updated];
+    });
+  }
+
   return (
     <Section title="Models">
-      <div className="flex flex-wrap gap-2">
-        {models.map((m) => (
-          <span key={m.id} className="px-2 py-1 rounded bg-white/10">{m.id}</span>
-        ))}
+      <div className="text-xs opacity-60 mb-3">Configure which model and persona to use for each channel</div>
+      <div className="space-y-2">
+        {CHANNEL_TYPES_FOR_CONFIG.map((ch) => {
+          const cfg = getConfig(ch.type);
+          return (
+            <div key={ch.type} className="flex items-center gap-3 p-2.5 rounded bg-white/5">
+              <span className="text-lg w-7 text-center">{ch.icon}</span>
+              <div className="w-24">
+                <div className="text-sm font-medium">{ch.name}</div>
+                <div className="text-[10px] opacity-40">{ch.detail}</div>
+              </div>
+              <select
+                value={cfg.persona_id || ''}
+                onChange={(e) => updateConfig(ch.type, 'persona_id', e.target.value ? Number(e.target.value) : null)}
+                className="px-2 py-1 text-xs rounded bg-black/40 border border-white/10 min-w-[120px]"
+              >
+                <option value="">Default persona</option>
+                {personas.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select
+                value={cfg.model || ''}
+                onChange={(e) => updateConfig(ch.type, 'model', e.target.value || null)}
+                className="px-2 py-1 text-xs rounded bg-black/40 border border-white/10 min-w-[160px]"
+              >
+                <option value="">Default model</option>
+                {models.map((m: any) => <option key={m.id} value={m.id}>{m.id}</option>)}
+              </select>
+            </div>
+          );
+        })}
       </div>
     </Section>
   );
@@ -132,17 +234,88 @@ function RulesSection() {
   );
 }
 
-function ProfileSection() {
+const SOCIAL_PLATFORMS = [
+  { key: 'twitter', label: 'X / Twitter', icon: '\uD835\uDD4F' },
+  { key: 'linkedin', label: 'LinkedIn', icon: 'in' },
+  { key: 'github', label: 'GitHub', icon: '\uD83D\uDC19' },
+  { key: 'instagram', label: 'Instagram', icon: '\uD83D\uDCF7' },
+  { key: 'bluesky', label: 'Bluesky', icon: '\uD83E\uDD4B' },
+  { key: 'substack', label: 'Substack', icon: '\u270D\uFE0F' },
+];
+
+function PersonalizationSection() {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
-  useState(() => { void fetch(`${CORE_URL}/api/profile`).then((r) => r.json()).then((j) => { setName(j.name || ''); setBio(j.bio || ''); }); });
-  async function save() { await fetch(`${CORE_URL}/api/profile`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, bio }) }); }
+  const [socials, setSocials] = useState<Record<string, string>>({});
+  const [language, setLanguage] = useState('');
+  const [timezone, setTimezone] = useState('');
+  const [shareLocation, setShareLocation] = useState(false);
+
+  useState(() => {
+    void fetch(`${CORE_URL}/api/profile`).then((r) => r.json()).then((j) => {
+      setName(j.name || '');
+      setBio(j.bio || '');
+      setSocials(j.social_links || {});
+      setLanguage(j.language || '');
+      setTimezone(j.timezone || '');
+      setShareLocation(j.share_location || false);
+    });
+  });
+
+  async function save() {
+    await fetch(`${CORE_URL}/api/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, bio, social_links: socials, language, timezone, share_location: shareLocation }),
+    });
+  }
+
   return (
     <Section title="Personalization">
-      <div className="flex gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
-        <input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
-        <button onClick={save} className="px-2 py-1 text-sm rounded bg-white/10">Save</button>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <div className="text-sm">Name</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full px-2 py-1.5 text-sm rounded bg-black/40 border border-white/10" />
+        </div>
+        <div className="space-y-1">
+          <div className="text-sm">Bio</div>
+          <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A short bio..." className="w-full h-20 px-2 py-1.5 text-sm rounded bg-black/40 border border-white/10" />
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-sm">Social Profiles</div>
+          <div className="flex flex-wrap gap-2">
+            {SOCIAL_PLATFORMS.map((p) => (
+              <div key={p.key} className="flex items-center gap-1.5">
+                <span className="text-sm w-5 text-center">{p.icon}</span>
+                <input
+                  value={socials[p.key] || ''}
+                  onChange={(e) => setSocials({ ...socials, [p.key]: e.target.value })}
+                  placeholder={p.label}
+                  className="w-36 px-2 py-1 text-xs rounded bg-black/40 border border-white/10"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <div className="space-y-1 flex-1">
+            <div className="text-sm">Language</div>
+            <input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="e.g. Canadian English" className="w-full px-2 py-1.5 text-sm rounded bg-black/40 border border-white/10" />
+          </div>
+          <div className="space-y-1 flex-1">
+            <div className="text-sm">Time Zone</div>
+            <input value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="e.g. America/New_York" className="w-full px-2 py-1.5 text-sm rounded bg-black/40 border border-white/10" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input type="checkbox" checked={shareLocation} onChange={(e) => setShareLocation(e.target.checked)} id="share-location" />
+          <label htmlFor="share-location" className="text-sm">Share location for local context</label>
+        </div>
+
+        <button onClick={save} className="px-3 py-1.5 text-sm rounded bg-white/10 hover:bg-white/15">Save</button>
       </div>
     </Section>
   );
@@ -322,6 +495,7 @@ function ChannelsSection() {
   const [channels, setChannels] = useState<any[]>([]);
   const [available, setAvailable] = useState<any[]>([]);
   const [personas, setPersonas] = useState<any[]>([]);
+  const [models, setModels] = useState<any[]>([]);
   const [pairingState, setPairingState] = useState<{ type: string; code?: string; inviteUrl?: string; email?: string; instructions?: string } | null>(null);
   const [smsPhone, setSmsPhone] = useState('');
   const [smsCode, setSmsCode] = useState('');
@@ -330,14 +504,17 @@ function ChannelsSection() {
   useState(() => { void refresh(); });
 
   async function refresh() {
-    const [chRes, avRes, pRes] = await Promise.all([
+    const [chRes, avRes, pRes, mRes] = await Promise.all([
       fetch(`${CORE_URL}/api/channels`),
       fetch(`${CORE_URL}/api/channels/available`),
       fetch(`${CORE_URL}/api/personas`),
+      fetch(`${CORE_URL}/api/models`),
     ]);
     setChannels(await chRes.json());
     setAvailable(await avRes.json());
     setPersonas(await pRes.json());
+    const mData = await mRes.json();
+    setModels(mData.data || []);
   }
 
   async function startPairing(type: string) {
@@ -381,11 +558,11 @@ function ChannelsSection() {
     alert(data.ok ? 'Test message sent!' : `Test failed: ${data.error}`);
   }
 
-  async function updatePersona(id: number, personaId: number | null) {
+  async function updateChannel(id: number, updates: any) {
     await fetch(`${CORE_URL}/api/channels/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ persona_id: personaId }),
+      body: JSON.stringify(updates),
     });
     await refresh();
   }
@@ -403,19 +580,20 @@ function ChannelsSection() {
 
   return (
     <>
-      {/* Connected Channels */}
+      {/* Connected Channels — "Ask [Persona] with [Model] over [channel]" pattern */}
       {channels.length > 0 && (
         <Section title="Connected Channels">
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             {channels.map((ch: any) => {
               const info = CHANNEL_INFO[ch.type] || { name: ch.type, icon: '\uD83D\uDD17', description: '' };
+              const personaName = personas.find((p: any) => p.id === ch.persona_id)?.name || 'Default';
               return (
-                <div key={ch.id} className="p-2 rounded bg-white/5 space-y-2">
+                <div key={ch.id} className="p-3 rounded-lg border border-white/10 bg-white/5 space-y-2">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">{info.icon}</span>
+                    <span className="text-xl">{info.icon}</span>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{info.name}</div>
-                      <div className="text-xs opacity-60 truncate">
+                      <div className="text-xs opacity-50 truncate">
                         {ch.config?.username || ch.config?.email || ch.config?.phone || 'Connected'}
                       </div>
                     </div>
@@ -425,20 +603,28 @@ function ChannelsSection() {
                     <button onClick={() => testChannel(ch.id)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">Test</button>
                     <button onClick={() => disconnect(ch.id)} className="px-2 py-1 text-xs rounded bg-red-600/40 hover:bg-red-600/60">Disconnect</button>
                   </div>
-                  {/* Per-channel persona */}
-                  <div className="flex items-center gap-2 ml-8">
-                    <span className="text-xs opacity-60">Persona:</span>
+                  {/* "Ask [Persona] with [Model] over [channel]" */}
+                  <div className="flex items-center gap-1.5 text-sm ml-8 flex-wrap">
+                    <span className="opacity-60">Ask</span>
                     <select
                       value={ch.persona_id || ''}
-                      onChange={(e) => updatePersona(ch.id, e.target.value ? Number(e.target.value) : null)}
+                      onChange={(e) => updateChannel(ch.id, { persona_id: e.target.value ? Number(e.target.value) : null })}
                       className="px-2 py-0.5 text-xs rounded bg-black/40 border border-white/10"
                     >
-                      <option value="">Use default</option>
-                      {personas.map((p: any) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                      <option value="">Default</option>
+                      {personas.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-                    <span className="text-xs opacity-40">How the AI responds on this channel</span>
+                    <span className="opacity-60">with</span>
+                    <select
+                      value={ch.model || ''}
+                      onChange={(e) => updateChannel(ch.id, { model: e.target.value || null })}
+                      className="px-2 py-0.5 text-xs rounded bg-black/40 border border-white/10"
+                    >
+                      <option value="">Default model</option>
+                      {models.map((m: any) => <option key={m.id} value={m.id}>{m.id}</option>)}
+                    </select>
+                    <span className="opacity-60">over</span>
+                    <span className="font-medium">{info.name}</span>
                   </div>
                 </div>
               );
@@ -464,7 +650,7 @@ function ChannelsSection() {
                   {!av.configured ? (
                     <span className="text-xs opacity-40">Set {av.envHint} in .env</span>
                   ) : isConnected ? (
-                    <span className="px-2 py-0.5 text-xs rounded bg-green-600/40">Connected</span>
+                    <button onClick={() => av.type === 'sms' ? setSmsPairing(true) : startPairing(av.type)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">+ Add</button>
                   ) : av.type === 'sms' ? (
                     <button onClick={() => setSmsPairing(true)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">Connect</button>
                   ) : (

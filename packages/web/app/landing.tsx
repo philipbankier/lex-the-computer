@@ -4,7 +4,7 @@ import Link from 'next/link';
 const features = [
   { title: 'AI Chat', desc: 'Multi-model streaming chat with @ mentions, personas, and rules', icon: '💬' },
   { title: 'File Manager', desc: 'Full workspace with Monaco editor, terminal, and AI-powered file tools', icon: '📁' },
-  { title: 'Agents', desc: 'Cron-scheduled AI agents with multi-channel delivery', icon: '⚡' },
+  { title: 'Automations', desc: 'Cron-scheduled AI automations with multi-channel delivery', icon: '⚡' },
   { title: 'Sites & Hosting', desc: 'Build and deploy websites from chat — Hono + Bun, custom domains', icon: '🌐' },
   { title: 'Skills', desc: 'Extensible skill system — install from hub or create your own', icon: '🧩' },
   { title: 'Integrations', desc: 'Gmail, Calendar, Notion, Drive, Linear, GitHub, Spotify + more', icon: '🔗' },
@@ -35,7 +35,7 @@ export function LandingPage() {
           Your personal AI computer.
         </h1>
         <p className="text-xl md:text-2xl opacity-60 mt-4 max-w-2xl mx-auto">
-          One command to deploy. Chat, files, agents, hosting, commerce — all self-hosted, fully open source.
+          One command to deploy. Chat, files, automations, hosting, commerce — all self-hosted, fully open source.
         </p>
         <div className="mt-8 flex gap-4 justify-center flex-wrap">
           <Link href="/home" className="px-6 py-3 bg-white text-black rounded-lg font-medium text-lg hover:bg-white/90">

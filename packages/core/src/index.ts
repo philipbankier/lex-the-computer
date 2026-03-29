@@ -38,6 +38,8 @@ import { domainsRouter } from './routes/domains.js';
 import { sellRouter } from './routes/sell.js';
 import { adminRouter } from './routes/admin.js';
 import { healthRouter } from './routes/health.js';
+import { channelConfigsRouter } from './routes/channel-configs.js';
+import { bookmarksRouter } from './routes/bookmarks.js';
 import { registerAllChannels, initializeChannels } from './services/channels/index.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { rateLimiter } from './middleware/rate-limit.js';
@@ -96,6 +98,10 @@ app.route('/api/browser', browserRouter);
 app.route('/mcp', mcpRouter);
 app.route('/api/ai-providers', aiProvidersRouter);
 app.route('/api/domains', domainsRouter);
+
+// Channel configs & Bookmarks
+app.route('/api/channel-configs', channelConfigsRouter);
+app.route('/api/bookmarks', bookmarksRouter);
 
 // Phase 11: Commerce, Admin, Health
 app.route('/api/sell', sellRouter);

@@ -126,7 +126,7 @@ export default function AdminPage() {
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           <StatCard title="Users" value={stats.counts.users} />
           <StatCard title="Conversations" value={stats.counts.conversations} />
-          <StatCard title="Agents" value={stats.counts.agents} />
+          <StatCard title="Automations" value={stats.counts.agents} />
           <StatCard title="CPUs" value={stats.system.cpus} />
           <StatCard title="Memory" value={`${formatBytes(stats.system.freeMemory)} / ${formatBytes(stats.system.totalMemory)}`} sub="free / total" />
           <StatCard title="Uptime" value={formatUptime(stats.system.uptime)} />

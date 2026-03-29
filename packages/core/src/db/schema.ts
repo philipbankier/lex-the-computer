@@ -21,7 +21,10 @@ export const user_profiles = pgTable('user_profiles', {
   display_name: varchar('display_name', { length: 255 }),
   bio: text('bio'),
   interests: jsonb('interests'), // string[]
-  social_links: jsonb('social_links'), // { twitter, github, linkedin, website }
+  social_links: jsonb('social_links'), // { twitter, github, linkedin, instagram, bluesky, substack, website }
+  language: varchar('language', { length: 64 }), // e.g. "Canadian English"
+  timezone: varchar('timezone', { length: 64 }), // e.g. "America/New_York"
+  share_location: boolean('share_location').default(false),
   avatar_url: text('avatar_url'),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -79,7 +82,7 @@ export const rules = pgTable('rules', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Agents (formerly "Automations") — SQL table kept as 'automations' for migration compat
+// Automations — UI says "Automations", API tools use "agent" names for Zo compat
 export const agents = pgTable('automations', {
   id: serial('id').primaryKey(),
   user_id: integer('user_id').notNull(),
@@ -258,6 +261,7 @@ export const channels = pgTable('channels', {
   type: varchar('type', { length: 16 }).notNull(), // 'telegram' | 'email' | 'discord' | 'sms'
   config: jsonb('config').notNull(), // provider-specific: chat_id, email address, discord user id, phone number, etc.
   persona_id: integer('persona_id'),
+  model: varchar('model', { length: 128 }), // per-channel model override
   is_active: boolean('is_active').default(true).notNull(),
   paired_at: timestamp('paired_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -270,6 +274,27 @@ export const channel_messages = pgTable('channel_messages', {
   external_id: text('external_id'),
   content: text('content'),
   conversation_id: integer('conversation_id'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Per-channel AI configuration (model + persona defaults for each channel type)
+export const channel_configs = pgTable('channel_configs', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  channel_type: varchar('channel_type', { length: 16 }).notNull(), // 'chat' | 'text' | 'email' | 'telegram' | 'discord'
+  persona_id: integer('persona_id'),
+  model: varchar('model', { length: 128 }),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Bookmarks for tabs, files, conversations
+export const bookmarks = pgTable('bookmarks', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  type: varchar('type', { length: 16 }).notNull(), // 'tab' | 'file' | 'conversation'
+  target_id: text('target_id'), // file path, conversation id, etc.
+  name: varchar('name', { length: 255 }).notNull(),
+  href: text('href'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
