@@ -33,10 +33,18 @@ import {
 import {
   useGmailTool, useCalendarTool, useNotionTool, useDriveTool,
   useDropboxTool, useLinearTool, useGithubTool, listAppToolsTool,
+  useAirtableTool, useSpotifyTool, useOneDriveTool, useGoogleTasksTool, useOutlookTool,
 } from '../tools/integration_tools.js';
 import {
   sendTelegramTool, sendEmailTool, sendDiscordTool, sendSmsTool,
 } from '../tools/channel_tools.js';
+import { browseWebTool, browserSessionTool } from '../tools/browser_tools.js';
+import {
+  generateImageTool, editImageTool, transcribeAudioTool, transcribeVideoTool,
+  generateVideoTool, createDiagramTool, describeDiagramTool,
+} from '../tools/media_tools.js';
+import { searchMapsTool } from '../tools/maps_tools.js';
+import { sshExecTool, sshUploadTool, sshDownloadTool } from '../tools/ssh_tools.js';
 import { buildSkillsContext } from '../services/skill-loader.js';
 
 export const chatRouter = new Hono();
@@ -175,6 +183,29 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     sendEmailTool,
     sendDiscordTool,
     sendSmsTool,
+    // Phase 10 Browser tools
+    browseWebTool,
+    browserSessionTool,
+    // Phase 10 Media tools
+    generateImageTool,
+    editImageTool,
+    transcribeAudioTool,
+    transcribeVideoTool,
+    generateVideoTool,
+    createDiagramTool,
+    describeDiagramTool,
+    // Phase 10 Maps tool
+    searchMapsTool,
+    // Phase 10 SSH tools
+    sshExecTool,
+    sshUploadTool,
+    sshDownloadTool,
+    // Phase 10 Integration tools
+    useAirtableTool,
+    useSpotifyTool,
+    useOneDriveTool,
+    useGoogleTasksTool,
+    useOutlookTool,
   ];
 
   // persist user message

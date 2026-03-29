@@ -261,3 +261,38 @@ integrationsRouter.post('/notion/connect', async (c) => {
     return c.json({ error: e.message }, 400);
   }
 });
+
+// Phase 10: Airtable connect (API key based, like Notion)
+integrationsRouter.post('/airtable/connect', async (c) => {
+  const body = await c.req.json();
+  const token = body.token;
+  if (!token) return c.json({ error: 'token required' }, 400);
+
+  try {
+    // Verify token by calling Airtable API
+    const res = await fetch('https://api.airtable.com/v0/meta/whoami', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Invalid token: ${res.status}`);
+    const user = await res.json();
+
+    const db = await getDb();
+    const userId = userIdFromCtx();
+    const permission = body.permission || 'readwrite';
+
+    const [integration] = await db.insert(schema.integrations).values({
+      user_id: userId,
+      provider: 'airtable',
+      label: user.email || 'Airtable',
+      access_token: token,
+      permission,
+      account_email: user.email || null,
+      account_name: user.email || null,
+      is_active: true,
+    } as any).returning();
+
+    return c.json({ ok: true, integration: { id: integration.id, provider: 'airtable', account_email: user.email } });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 400);
+  }
+});

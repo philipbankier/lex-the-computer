@@ -7,6 +7,11 @@ import * as drive from '../services/integrations/drive.js';
 import * as dropbox from '../services/integrations/dropbox.js';
 import * as linear from '../services/integrations/linear.js';
 import * as github from '../services/integrations/github.js';
+import * as airtable from '../services/integrations/airtable.js';
+import * as spotify from '../services/integrations/spotify.js';
+import * as onedrive from '../services/integrations/onedrive.js';
+import * as googleTasks from '../services/integrations/google-tasks.js';
+import * as outlook from '../services/integrations/outlook.js';
 import { getDb, schema } from '../lib/db.js';
 import { eq } from 'drizzle-orm';
 
@@ -352,6 +357,204 @@ export const useGithubTool: ToolDefinition<{
   },
 };
 
+// --- Airtable Tool ---
+export const useAirtableTool: ToolDefinition<{
+  action: 'list-bases' | 'list-tables' | 'list-records' | 'create-record' | 'update-record';
+  base_id?: string; table_id?: string; filter?: string; record_id?: string; fields?: Record<string, any>;
+}> = {
+  name: 'use_airtable',
+  description: 'Interact with Airtable: list bases, list tables, list/create/update records. Requires AIRTABLE_API_KEY.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['list-bases', 'list-tables', 'list-records', 'create-record', 'update-record'], description: 'The action to perform' },
+      base_id: { type: 'string', description: 'Airtable base ID' },
+      table_id: { type: 'string', description: 'Table ID or name' },
+      filter: { type: 'string', description: 'Filter formula (for list-records)' },
+      record_id: { type: 'string', description: 'Record ID (for update-record)' },
+      fields: { type: 'object', description: 'Field values (for create/update-record)' },
+    },
+    required: ['action'],
+  },
+  async execute(params) {
+    switch (params.action) {
+      case 'list-bases': return airtable.listBases();
+      case 'list-tables': {
+        if (!params.base_id) throw new Error('base_id required');
+        return airtable.listTables(params.base_id);
+      }
+      case 'list-records': {
+        if (!params.base_id || !params.table_id) throw new Error('base_id and table_id required');
+        return airtable.listRecords(params.base_id, params.table_id, params.filter);
+      }
+      case 'create-record': {
+        if (!params.base_id || !params.table_id || !params.fields) throw new Error('base_id, table_id, and fields required');
+        return airtable.createRecord(params.base_id, params.table_id, params.fields);
+      }
+      case 'update-record': {
+        if (!params.base_id || !params.table_id || !params.record_id || !params.fields) throw new Error('base_id, table_id, record_id, and fields required');
+        return airtable.updateRecord(params.base_id, params.table_id, params.record_id, params.fields);
+      }
+      default: throw new Error(`Unknown action: ${params.action}`);
+    }
+  },
+};
+
+// --- Spotify Tool ---
+export const useSpotifyTool: ToolDefinition<{
+  action: 'search' | 'playback' | 'playlists' | 'play' | 'pause' | 'skip';
+  query?: string; uri?: string;
+}> = {
+  name: 'use_spotify',
+  description: 'Interact with Spotify: search tracks, get current playback, list playlists, play/pause/skip. Requires Spotify integration.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['search', 'playback', 'playlists', 'play', 'pause', 'skip'], description: 'The action to perform' },
+      query: { type: 'string', description: 'Search query (for search action)' },
+      uri: { type: 'string', description: 'Spotify URI to play (for play action)' },
+    },
+    required: ['action'],
+  },
+  async execute(params) {
+    const isWrite = ['play', 'pause', 'skip'].includes(params.action);
+    const integration = await requireIntegration('spotify', isWrite);
+    switch (params.action) {
+      case 'search': return spotify.searchTracks(integration.id, params.query || '');
+      case 'playback': return spotify.getCurrentPlayback(integration.id);
+      case 'playlists': return spotify.getPlaylists(integration.id);
+      case 'play': return spotify.play(integration.id, params.uri);
+      case 'pause': return spotify.pause(integration.id);
+      case 'skip': return spotify.skipNext(integration.id);
+      default: throw new Error(`Unknown action: ${params.action}`);
+    }
+  },
+};
+
+// --- OneDrive Tool ---
+export const useOneDriveTool: ToolDefinition<{
+  action: 'search' | 'get' | 'download' | 'upload';
+  query?: string; item_id?: string; path?: string; content?: string;
+}> = {
+  name: 'use_onedrive',
+  description: 'Interact with OneDrive: search, get file info, download, and upload files. Requires OneDrive integration.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['search', 'get', 'download', 'upload'], description: 'The action to perform' },
+      query: { type: 'string', description: 'Search query (for search action)' },
+      item_id: { type: 'string', description: 'OneDrive item ID (for get/download)' },
+      path: { type: 'string', description: 'File path in OneDrive (for upload)' },
+      content: { type: 'string', description: 'File content (for upload)' },
+    },
+    required: ['action'],
+  },
+  async execute(params) {
+    const isWrite = params.action === 'upload';
+    const integration = await requireIntegration('onedrive', isWrite);
+    switch (params.action) {
+      case 'search': return onedrive.searchFiles(integration.id, params.query || '');
+      case 'get': {
+        if (!params.item_id) throw new Error('item_id required');
+        return onedrive.getFile(integration.id, params.item_id);
+      }
+      case 'download': {
+        if (!params.item_id) throw new Error('item_id required');
+        const content = await onedrive.downloadFile(integration.id, params.item_id);
+        return { item_id: params.item_id, content: content.slice(0, 10000) };
+      }
+      case 'upload': {
+        if (!params.path || !params.content) throw new Error('path and content required');
+        return onedrive.uploadFile(integration.id, params.path, params.content);
+      }
+      default: throw new Error(`Unknown action: ${params.action}`);
+    }
+  },
+};
+
+// --- Google Tasks Tool ---
+export const useGoogleTasksTool: ToolDefinition<{
+  action: 'list-lists' | 'list-tasks' | 'create' | 'complete' | 'delete';
+  list_id?: string; task_id?: string; title?: string; notes?: string; due?: string;
+}> = {
+  name: 'use_google_tasks',
+  description: 'Interact with Google Tasks: list task lists, list tasks, create/complete/delete tasks. Requires Google Tasks integration.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['list-lists', 'list-tasks', 'create', 'complete', 'delete'], description: 'The action to perform' },
+      list_id: { type: 'string', description: 'Task list ID' },
+      task_id: { type: 'string', description: 'Task ID (for complete/delete)' },
+      title: { type: 'string', description: 'Task title (for create)' },
+      notes: { type: 'string', description: 'Task notes (for create)' },
+      due: { type: 'string', description: 'Due date ISO 8601 (for create)' },
+    },
+    required: ['action'],
+  },
+  async execute(params) {
+    const isWrite = ['create', 'complete', 'delete'].includes(params.action);
+    const integration = await requireIntegration('google-tasks', isWrite);
+    switch (params.action) {
+      case 'list-lists': return googleTasks.listTaskLists(integration.id);
+      case 'list-tasks': {
+        if (!params.list_id) throw new Error('list_id required');
+        return googleTasks.listTasks(integration.id, params.list_id);
+      }
+      case 'create': {
+        if (!params.list_id || !params.title) throw new Error('list_id and title required');
+        return googleTasks.createTask(integration.id, params.list_id, params.title, params.notes, params.due);
+      }
+      case 'complete': {
+        if (!params.list_id || !params.task_id) throw new Error('list_id and task_id required');
+        return googleTasks.completeTask(integration.id, params.list_id, params.task_id);
+      }
+      case 'delete': {
+        if (!params.list_id || !params.task_id) throw new Error('list_id and task_id required');
+        return googleTasks.deleteTask(integration.id, params.list_id, params.task_id);
+      }
+      default: throw new Error(`Unknown action: ${params.action}`);
+    }
+  },
+};
+
+// --- Outlook Tool ---
+export const useOutlookTool: ToolDefinition<{
+  action: 'search' | 'read' | 'send' | 'folders';
+  query?: string; email_id?: string; to?: string; subject?: string; body?: string;
+}> = {
+  name: 'use_outlook',
+  description: 'Interact with Microsoft Outlook: search emails, read email, send email, list folders. Requires Outlook integration.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['search', 'read', 'send', 'folders'], description: 'The action to perform' },
+      query: { type: 'string', description: 'Search query (for search action)' },
+      email_id: { type: 'string', description: 'Email ID (for read action)' },
+      to: { type: 'string', description: 'Recipient email (for send action)' },
+      subject: { type: 'string', description: 'Email subject (for send action)' },
+      body: { type: 'string', description: 'Email body text (for send action)' },
+    },
+    required: ['action'],
+  },
+  async execute(params) {
+    const isWrite = params.action === 'send';
+    const integration = await requireIntegration('outlook', isWrite);
+    switch (params.action) {
+      case 'search': return outlook.searchEmails(integration.id, params.query || '');
+      case 'read': {
+        if (!params.email_id) throw new Error('email_id required');
+        return outlook.getEmail(integration.id, params.email_id);
+      }
+      case 'send': {
+        if (!params.to || !params.subject || !params.body) throw new Error('to, subject, and body required');
+        return outlook.sendEmail(integration.id, params.to, params.subject, params.body);
+      }
+      case 'folders': return outlook.listFolders(integration.id);
+      default: throw new Error(`Unknown action: ${params.action}`);
+    }
+  },
+};
+
 // --- List App Tools ---
 export const listAppToolsTool: ToolDefinition<{}> = {
   name: 'list_app_tools',
@@ -370,6 +573,11 @@ export const listAppToolsTool: ToolDefinition<{}> = {
       dropbox: ['search', 'get', 'download', 'upload'],
       linear: ['search', 'get', 'create', 'update', 'list-teams'],
       github: ['list-repos', 'get-repo', 'list-issues', 'create-issue', 'list-prs', 'get-file'],
+      airtable: ['list-bases', 'list-tables', 'list-records', 'create-record', 'update-record'],
+      spotify: ['search', 'playback', 'playlists', 'play', 'pause', 'skip'],
+      onedrive: ['search', 'get', 'download', 'upload'],
+      'google-tasks': ['list-lists', 'list-tasks', 'create', 'complete', 'delete'],
+      outlook: ['search', 'read', 'send', 'folders'],
     };
 
     const providerToolNames: Record<string, string> = {
@@ -380,6 +588,11 @@ export const listAppToolsTool: ToolDefinition<{}> = {
       dropbox: 'use_dropbox',
       linear: 'use_linear',
       github: 'use_github',
+      airtable: 'use_airtable',
+      spotify: 'use_spotify',
+      onedrive: 'use_onedrive',
+      'google-tasks': 'use_google_tasks',
+      outlook: 'use_outlook',
     };
 
     return {

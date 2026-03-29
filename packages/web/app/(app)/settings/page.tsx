@@ -29,6 +29,7 @@ export default function SettingsShell() {
           <ProvidersSection />
           <ProfileSection />
           <RulesSection />
+          <BrowserSection />
         </div>
       )}
 
@@ -58,6 +59,7 @@ export default function SettingsShell() {
         <div className="grid gap-3">
           <SecretsSection />
           <ApiKeysSection />
+          <SSHSection />
           <Section title="Danger Zone">
             <button className="px-2 py-1 text-sm rounded bg-red-600/80">Delete account</button>
           </Section>
@@ -174,17 +176,24 @@ const PROVIDER_INFO: Record<string, { name: string; icon: string; description: s
   gmail: { name: 'Gmail', icon: '\u2709\uFE0F', description: 'Search, read, and send emails' },
   'google-calendar': { name: 'Google Calendar', icon: '\uD83D\uDCC5', description: 'View and manage calendar events' },
   'google-drive': { name: 'Google Drive', icon: '\uD83D\uDCC1', description: 'Search, download, and upload files' },
+  'google-tasks': { name: 'Google Tasks', icon: '\u2705', description: 'Manage task lists and tasks' },
   notion: { name: 'Notion', icon: '\uD83D\uDCD3', description: 'Search and manage pages and databases' },
   dropbox: { name: 'Dropbox', icon: '\uD83D\uDCE6', description: 'Search, download, and upload files' },
   linear: { name: 'Linear', icon: '\uD83D\uDCCB', description: 'Search and manage issues and projects' },
   github: { name: 'GitHub', icon: '\uD83D\uDC19', description: 'Access repos, issues, and pull requests' },
+  airtable: { name: 'Airtable', icon: '\uD83D\uDDC3\uFE0F', description: 'Access bases, tables, and records' },
+  spotify: { name: 'Spotify', icon: '\uD83C\uDFB5', description: 'Search tracks, control playback, manage playlists' },
+  onedrive: { name: 'OneDrive', icon: '\u2601\uFE0F', description: 'Search, download, and upload files' },
+  outlook: { name: 'Outlook', icon: '\uD83D\uDCE7', description: 'Search, read, and send emails' },
 };
+
+const TOKEN_BASED_PROVIDERS = ['notion', 'airtable'];
 
 function IntegrationsSection() {
   const [integrations, setIntegrations] = useState<any[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
-  const [notionToken, setNotionToken] = useState('');
-  const [showNotion, setShowNotion] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [showTokenFor, setShowTokenFor] = useState<string | null>(null);
   useState(() => { void refresh(); });
 
   async function refresh() {
@@ -220,15 +229,15 @@ function IntegrationsSection() {
     window.addEventListener('message', handler);
   }
 
-  async function connectNotion() {
-    if (!notionToken.trim()) return;
-    const res = await fetch(`${CORE_URL}/api/integrations/notion/connect`, {
+  async function connectToken(provider: string) {
+    if (!tokenInput.trim()) return;
+    const res = await fetch(`${CORE_URL}/api/integrations/${provider}/connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: notionToken }),
+      body: JSON.stringify({ token: tokenInput }),
     });
     const data = await res.json();
-    if (data.ok) { setNotionToken(''); setShowNotion(false); await refresh(); }
+    if (data.ok) { setTokenInput(''); setShowTokenFor(null); await refresh(); }
     else alert(`Failed: ${data.error}`);
   }
 
@@ -271,15 +280,15 @@ function IntegrationsSection() {
                   <div className="font-medium text-sm">{info.name}</div>
                   <div className="text-xs opacity-60">{info.description}</div>
                 </div>
-                {p.provider === 'notion' ? (
-                  showNotion ? (
+                {TOKEN_BASED_PROVIDERS.includes(p.provider) ? (
+                  showTokenFor === p.provider ? (
                     <div className="flex gap-1">
-                      <input value={notionToken} onChange={(e) => setNotionToken(e.target.value)} placeholder="Integration token" className="px-2 py-1 text-xs rounded bg-black/40 border border-white/10 w-48" />
-                      <button onClick={connectNotion} className="px-2 py-1 text-xs rounded bg-white/10">Save</button>
-                      <button onClick={() => setShowNotion(false)} className="px-2 py-1 text-xs rounded bg-white/10">Cancel</button>
+                      <input value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} placeholder={`${p.provider === 'airtable' ? 'API' : 'Integration'} token`} className="px-2 py-1 text-xs rounded bg-black/40 border border-white/10 w-48" />
+                      <button onClick={() => connectToken(p.provider)} className="px-2 py-1 text-xs rounded bg-white/10">Save</button>
+                      <button onClick={() => setShowTokenFor(null)} className="px-2 py-1 text-xs rounded bg-white/10">Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={() => setShowNotion(true)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">
+                    <button onClick={() => setShowTokenFor(p.provider)} className="px-2 py-1 text-xs rounded bg-white/10 hover:bg-white/20">
                       {isConnected ? '+ Add Another' : 'Connect'}
                     </button>
                   )
@@ -623,6 +632,143 @@ function SecretsSection() {
           </span>
         ))}
       </div>
+    </Section>
+  );
+}
+
+// ─── Phase 10: Browser Section ──────────────────────────────────────
+
+function BrowserSection() {
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loginUrl, setLoginUrl] = useState('');
+  useState(() => { void refresh(); });
+
+  async function refresh() {
+    const r = await fetch(`${CORE_URL}/api/browser/sessions`);
+    setSessions(await r.json());
+  }
+
+  async function deleteSession(id: number) {
+    await fetch(`${CORE_URL}/api/browser/sessions/${id}`, { method: 'DELETE' });
+    await refresh();
+  }
+
+  async function loginToSite() {
+    if (!loginUrl.trim()) return;
+    await fetch(`${CORE_URL}/api/browser/navigate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: loginUrl }),
+    });
+    await fetch(`${CORE_URL}/api/browser/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site_url: loginUrl }),
+    });
+    setLoginUrl('');
+    await refresh();
+  }
+
+  return (
+    <Section title="AI Browser">
+      <div className="text-xs opacity-80 mb-2">Manage browser sessions for the AI to access logged-in sites</div>
+      <div className="flex gap-2 mb-2">
+        <input value={loginUrl} onChange={(e) => setLoginUrl(e.target.value)} placeholder="https://example.com" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+        <button onClick={loginToSite} className="px-2 py-1 text-sm rounded bg-white/10">Log into site</button>
+      </div>
+      {sessions.length > 0 && (
+        <div className="grid gap-1">
+          {sessions.map((s: any) => (
+            <div key={s.id} className="flex items-center gap-2 p-1.5 rounded bg-white/5 text-sm">
+              <span className="flex-1 truncate">{s.label || s.site_url}</span>
+              <span className="text-xs opacity-40">{s.last_used ? new Date(s.last_used).toLocaleDateString() : ''}</span>
+              <button onClick={() => deleteSession(s.id)} className="px-1.5 py-0.5 text-xs rounded bg-red-600/40 hover:bg-red-600/60">Delete</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {sessions.length === 0 && <div className="text-xs opacity-60">No browser sessions saved</div>}
+    </Section>
+  );
+}
+
+// ─── Phase 10: SSH Section ──────────────────────────────────────
+
+function SSHSection() {
+  const [keys, setKeys] = useState<any[]>([]);
+  const [name, setName] = useState('');
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState('22');
+  const [username, setUsername] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  useState(() => { void refresh(); });
+
+  async function refresh() {
+    const r = await fetch(`${CORE_URL}/api/ssh/keys`);
+    setKeys(await r.json());
+  }
+
+  async function addKey() {
+    if (!name.trim() || !host.trim() || !username.trim()) return;
+    await fetch(`${CORE_URL}/api/ssh/keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, host, port: Number(port), username, private_key: privateKey || undefined }),
+    });
+    setName(''); setHost(''); setPort('22'); setUsername(''); setPrivateKey('');
+    setShowForm(false);
+    await refresh();
+  }
+
+  async function removeKey(id: number) {
+    if (!confirm('Remove this SSH connection?')) return;
+    await fetch(`${CORE_URL}/api/ssh/keys/${id}`, { method: 'DELETE' });
+    await refresh();
+  }
+
+  async function testKey(id: number) {
+    const res = await fetch(`${CORE_URL}/api/ssh/keys/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    alert(data.ok ? 'Connection successful!' : `Connection failed: ${data.error}`);
+  }
+
+  return (
+    <Section title="SSH Connections">
+      <div className="text-xs opacity-80 mb-2">Manage SSH connections for remote server access</div>
+      {keys.length > 0 && (
+        <div className="grid gap-1 mb-2">
+          {keys.map((k: any) => (
+            <div key={k.id} className="flex items-center gap-2 p-1.5 rounded bg-white/5 text-sm">
+              <span className="font-medium">{k.name}</span>
+              <code className="text-xs opacity-60">{k.username}@{k.host}:{k.port}</code>
+              <span className="text-xs opacity-40">{k.last_connected ? `Last: ${new Date(k.last_connected).toLocaleDateString()}` : 'Never used'}</span>
+              <div className="flex-1" />
+              <button onClick={() => testKey(k.id)} className="px-1.5 py-0.5 text-xs rounded bg-white/10 hover:bg-white/20">Test</button>
+              <button onClick={() => removeKey(k.id)} className="px-1.5 py-0.5 text-xs rounded bg-red-600/40 hover:bg-red-600/60">Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {showForm ? (
+        <div className="space-y-2 p-2 rounded bg-white/5">
+          <div className="flex gap-2">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (e.g. My VPS)" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="Host" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+            <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="22" className="w-16 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+          </div>
+          <div className="flex gap-2">
+            <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+          </div>
+          <textarea value={privateKey} onChange={(e) => setPrivateKey(e.target.value)} placeholder="Private key (PEM format, optional)" className="w-full h-20 px-2 py-1 text-sm rounded bg-black/40 border border-white/10 font-mono" />
+          <div className="flex gap-2">
+            <button onClick={addKey} className="px-2 py-1 text-sm rounded bg-white/10">Add Connection</button>
+            <button onClick={() => setShowForm(false)} className="px-2 py-1 text-sm rounded bg-white/10">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setShowForm(true)} className="px-2 py-1 text-sm rounded bg-white/10">Add SSH Connection</button>
+      )}
     </Section>
   );
 }

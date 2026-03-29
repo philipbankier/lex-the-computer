@@ -30,6 +30,9 @@ import { datasetsRouter } from './routes/datasets.js';
 import { systemRouter } from './routes/system.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { searchRouter } from './routes/search.js';
+import { sshRouter } from './routes/ssh.js';
+import { browserRouter } from './routes/browser.js';
+import { mcpRouter } from './routes/mcp.js';
 import { registerAllChannels, initializeChannels } from './services/channels/index.js';
 
 const app = new Hono();
@@ -79,6 +82,11 @@ app.route('/api/datasets', datasetsRouter);
 app.route('/api/system', systemRouter);
 app.route('/api/notifications', notificationsRouter);
 app.route('/api/search', searchRouter);
+
+// Phase 10: Advanced Features
+app.route('/api/ssh', sshRouter);
+app.route('/api/browser', browserRouter);
+app.route('/mcp', mcpRouter);
 
 async function ensureWorkspace() {
   const base = env.WORKSPACE_DIR;

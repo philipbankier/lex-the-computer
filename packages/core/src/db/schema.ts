@@ -270,6 +270,32 @@ export const channel_messages = pgTable('channel_messages', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Phase 10: SSH keys
+export const ssh_keys = pgTable('ssh_keys', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  host: varchar('host', { length: 255 }).notNull(),
+  port: integer('port').default(22).notNull(),
+  username: varchar('username', { length: 255 }).notNull(),
+  private_key: text('private_key'),
+  passphrase: text('passphrase'),
+  fingerprint: text('fingerprint'),
+  last_connected: timestamp('last_connected', { withTimezone: true }),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Phase 10: Browser sessions
+export const browser_sessions = pgTable('browser_sessions', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  site_url: text('site_url').notNull(),
+  label: varchar('label', { length: 255 }),
+  cookies: text('cookies'), // JSON stringified cookies
+  last_used: timestamp('last_used', { withTimezone: true }).defaultNow().notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Phase 4a: Services table
 export const services = pgTable('services', {
   id: serial('id').primaryKey(),

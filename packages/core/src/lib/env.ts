@@ -38,4 +38,19 @@ export const env = {
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
+  // Phase 10: Advanced Features
+  // Image generation
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  STABILITY_API_KEY: process.env.STABILITY_API_KEY || '',
+  REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || '',
+  // Google Maps
+  GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
+  // Airtable
+  AIRTABLE_API_KEY: process.env.AIRTABLE_API_KEY || '',
+  // Spotify
+  SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID || '',
+  SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET || '',
+  // Microsoft (OneDrive + Outlook)
+  MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID || '',
+  MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET || '',
 };

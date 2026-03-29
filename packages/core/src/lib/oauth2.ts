@@ -55,6 +55,19 @@ const GOOGLE_PROVIDERS: Record<string, OAuthProviderConfig> = {
     userinfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
     parseUserinfo: (d: any) => ({ email: d.email, name: d.name, avatar: d.picture }),
   },
+  'google-tasks': {
+    provider: 'google-tasks',
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    scopes: {
+      read: ['https://www.googleapis.com/auth/tasks.readonly', 'openid', 'email', 'profile'],
+      readwrite: ['https://www.googleapis.com/auth/tasks', 'openid', 'email', 'profile'],
+    },
+    userinfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+    parseUserinfo: (d: any) => ({ email: d.email, name: d.name, avatar: d.picture }),
+  },
 };
 
 const OTHER_PROVIDERS: Record<string, OAuthProviderConfig> = {
@@ -95,6 +108,45 @@ const OTHER_PROVIDERS: Record<string, OAuthProviderConfig> = {
     userinfoUrl: 'https://api.github.com/user',
     parseUserinfo: (d: any) => ({ email: d.email, name: d.name || d.login, avatar: d.avatar_url }),
   },
+  spotify: {
+    provider: 'spotify',
+    authUrl: 'https://accounts.spotify.com/authorize',
+    tokenUrl: 'https://accounts.spotify.com/api/token',
+    clientId: env.SPOTIFY_CLIENT_ID,
+    clientSecret: env.SPOTIFY_CLIENT_SECRET,
+    scopes: {
+      read: ['user-read-playback-state', 'user-read-currently-playing', 'playlist-read-private'],
+      readwrite: ['user-read-playback-state', 'user-read-currently-playing', 'user-modify-playback-state', 'playlist-read-private', 'playlist-modify-public', 'playlist-modify-private'],
+    },
+    userinfoUrl: 'https://api.spotify.com/v1/me',
+    parseUserinfo: (d: any) => ({ email: d.email, name: d.display_name, avatar: d.images?.[0]?.url }),
+  },
+  onedrive: {
+    provider: 'onedrive',
+    authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+    tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    clientId: env.MICROSOFT_CLIENT_ID,
+    clientSecret: env.MICROSOFT_CLIENT_SECRET,
+    scopes: {
+      read: ['Files.Read', 'User.Read', 'offline_access'],
+      readwrite: ['Files.ReadWrite', 'User.Read', 'offline_access'],
+    },
+    userinfoUrl: 'https://graph.microsoft.com/v1.0/me',
+    parseUserinfo: (d: any) => ({ email: d.mail || d.userPrincipalName, name: d.displayName, avatar: undefined }),
+  },
+  outlook: {
+    provider: 'outlook',
+    authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+    tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    clientId: env.MICROSOFT_CLIENT_ID,
+    clientSecret: env.MICROSOFT_CLIENT_SECRET,
+    scopes: {
+      read: ['Mail.Read', 'User.Read', 'offline_access'],
+      readwrite: ['Mail.ReadWrite', 'Mail.Send', 'User.Read', 'offline_access'],
+    },
+    userinfoUrl: 'https://graph.microsoft.com/v1.0/me',
+    parseUserinfo: (d: any) => ({ email: d.mail || d.userPrincipalName, name: d.displayName, avatar: undefined }),
+  },
 };
 
 export const PROVIDER_CONFIGS: Record<string, OAuthProviderConfig> = {
@@ -102,8 +154,8 @@ export const PROVIDER_CONFIGS: Record<string, OAuthProviderConfig> = {
   ...OTHER_PROVIDERS,
 };
 
-// Notion uses internal integration tokens, not OAuth2
-export const TOKEN_PROVIDERS = ['notion'] as const;
+// Notion and Airtable use internal integration tokens, not OAuth2
+export const TOKEN_PROVIDERS = ['notion', 'airtable'] as const;
 
 export function getProviderConfig(provider: string): OAuthProviderConfig | undefined {
   return PROVIDER_CONFIGS[provider];
@@ -111,6 +163,7 @@ export function getProviderConfig(provider: string): OAuthProviderConfig | undef
 
 export function isConfigured(provider: string): boolean {
   if (provider === 'notion') return true; // token-based, always available
+  if (provider === 'airtable') return !!env.AIRTABLE_API_KEY;
   const config = PROVIDER_CONFIGS[provider];
   if (!config) return false;
   return !!(config.clientId && config.clientSecret);
@@ -291,7 +344,11 @@ export async function findIntegration(userId: number, provider: string) {
 
 // List all providers with their configuration status
 export function listProviders() {
-  const all = ['gmail', 'google-calendar', 'google-drive', 'notion', 'dropbox', 'linear', 'github'];
+  const all = [
+    'gmail', 'google-calendar', 'google-drive', 'google-tasks',
+    'notion', 'dropbox', 'linear', 'github',
+    'airtable', 'spotify', 'onedrive', 'outlook',
+  ];
   return all.map(p => ({
     provider: p,
     configured: isConfigured(p),
