@@ -73,7 +73,7 @@ onboardingRouter.post('/automation', async (c) => {
   const body = await c.req.json();
   const { name, instruction, schedule, delivery } = body;
 
-  const [automation] = await db.insert(schema.automations).values({
+  const [automation] = await db.insert(schema.agents).values({
     user_id: id,
     name,
     instruction,

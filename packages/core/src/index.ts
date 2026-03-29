@@ -17,7 +17,7 @@ import { sitesRouter } from './routes/sites.js';
 import { servicesRouter } from './routes/services.js';
 import { secretsRouter } from './routes/secrets.js';
 import { terminalRouter } from './routes/terminal.js';
-import { automationsRouter } from './routes/automations.js';
+import { agentsRouter } from './routes/automations.js';
 import { spaceRouter, spacePublicRouter } from './routes/space.js';
 import { skillsRouter } from './routes/skills.js';
 import { integrationsRouter } from './routes/integrations.js';
@@ -34,6 +34,7 @@ import { sshRouter } from './routes/ssh.js';
 import { browserRouter } from './routes/browser.js';
 import { mcpRouter } from './routes/mcp.js';
 import { aiProvidersRouter } from './routes/ai-providers.js';
+import { domainsRouter } from './routes/domains.js';
 import { registerAllChannels, initializeChannels } from './services/channels/index.js';
 
 const app = new Hono();
@@ -59,7 +60,7 @@ app.route('/api/settings', settingsRouter);
 app.route('/api/models', modelsRouter);
 app.route('/api/files', filesRouter);
 app.route('/api/terminal', terminalRouter);
-app.route('/api/automations', automationsRouter);
+app.route('/api/agents', agentsRouter);
 app.route('/api/sites', sitesRouter);
 app.route('/api/services', servicesRouter);
 app.route('/api/secrets', secretsRouter);
@@ -89,10 +90,11 @@ app.route('/api/ssh', sshRouter);
 app.route('/api/browser', browserRouter);
 app.route('/mcp', mcpRouter);
 app.route('/api/ai-providers', aiProvidersRouter);
+app.route('/api/domains', domainsRouter);
 
 async function ensureWorkspace() {
   const base = env.WORKSPACE_DIR;
-  const subdirs = ['files', 'sites', 'skills', 'articles', '.config', 'space-assets', 'datasets'];
+  const subdirs = ['files', 'sites', 'Skills', 'articles', '.config', 'space-assets', 'datasets'];
   try {
     await fs.mkdir(base, { recursive: true });
     await Promise.all(subdirs.map((d) => fs.mkdir(path.join(base, d), { recursive: true })));

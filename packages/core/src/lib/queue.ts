@@ -28,20 +28,20 @@ export async function getQueue() {
   const IORedis = await getIORedis();
   if (!bull || !IORedis) return null;
   const connection = new IORedis.default(env.REDIS_URL);
-  _queue = new bull.Queue('automations', { connection });
+  _queue = new bull.Queue('agents', { connection });
   return _queue;
 }
 
-export async function ensureWorker(processor: (automationId: number) => Promise<void>) {
+export async function ensureWorker(processor: (agentId: number) => Promise<void>) {
   if (_worker) return _worker;
   const bull = await getBull();
   const IORedis = await getIORedis();
   if (!bull || !IORedis) return null;
   const connection = new IORedis.default(env.REDIS_URL);
   _worker = new bull.Worker(
-    'automations',
+    'agents',
     async (job: any) => {
-      const id = job?.data?.automationId;
+      const id = job?.data?.agentId;
       if (typeof id === 'number') {
         await processor(id);
       }
@@ -51,25 +51,25 @@ export async function ensureWorker(processor: (automationId: number) => Promise<
   return _worker;
 }
 
-export async function scheduleAutomation(id: number, cron: string) {
+export async function scheduleAgent(id: number, cron: string) {
   const q = await getQueue();
   if (!q) return null;
-  const name = `automation:${id}`;
-  // Remove existing repeatable job for this automation
+  const name = `agent:${id}`;
+  // Remove existing repeatable job for this agent
   try {
     const jobs = await q.getRepeatableJobs();
     const existing = jobs.find((j: any) => j.name === name);
     if (existing) await q.removeRepeatableByKey(existing.key);
   } catch {}
   // Add new repeatable
-  return q.add(name, { automationId: id }, { repeat: { pattern: cron }, jobId: name });
+  return q.add(name, { agentId: id }, { repeat: { pattern: cron }, jobId: name });
 }
 
-export async function removeAutomationSchedule(id: number) {
+export async function removeAgentSchedule(id: number) {
   const q = await getQueue();
   if (!q) return null;
   try {
-    const name = `automation:${id}`;
+    const name = `agent:${id}`;
     const jobs = await q.getRepeatableJobs();
     const existing = jobs.find((j: any) => j.name === name);
     if (existing) await q.removeRepeatableByKey(existing.key);
@@ -77,8 +77,8 @@ export async function removeAutomationSchedule(id: number) {
   return null;
 }
 
-export async function runAutomationNow(id: number) {
+export async function runAgentNow(id: number) {
   const q = await getQueue();
   if (!q) return null;
-  return q.add('run-now', { automationId: id });
+  return q.add('run-now', { agentId: id });
 }

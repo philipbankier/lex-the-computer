@@ -13,10 +13,10 @@ import { searchFilesTool } from '../tools/search_files.js';
 import { runCommand } from '../tools/run_command.js';
 import { runSequentialCommands } from '../tools/run_sequential_commands.js';
 import { runParallelCommands } from '../tools/run_parallel_commands.js';
-import { createAutomationTool } from '../tools/create_automation.js';
-import { editAutomationTool } from '../tools/edit_automation.js';
-import { deleteAutomationTool } from '../tools/delete_automation.js';
-import { listAutomationsTool } from '../tools/list_automations.js';
+import { createAgentTool } from '../tools/create_automation.js';
+import { editAgentTool } from '../tools/edit_automation.js';
+import { deleteAgentTool } from '../tools/delete_automation.js';
+import { listAgentsTool } from '../tools/list_automations.js';
 import { createSiteTool } from '../tools/create_site.js';
 import { publishSiteTool, unpublishSiteTool } from '../tools/publish_site.js';
 import { registerServiceTool, updateServiceTool, deleteServiceTool, listServicesTool } from '../tools/services_tools.js';
@@ -45,6 +45,10 @@ import {
 } from '../tools/media_tools.js';
 import { searchMapsTool } from '../tools/maps_tools.js';
 import { sshExecTool, sshUploadTool, sshDownloadTool } from '../tools/ssh_tools.js';
+import {
+  proxyLocalServiceTool, serviceDoctorTool, findSimilarLinksTool, imageSearchTool,
+  editFileLlmTool, changeHardwareTool, setActivePersonaTool, updateUserSettingsTool,
+} from '../tools/extra_tools.js';
 import { buildSkillsContext } from '../services/skill-loader.js';
 
 export const chatRouter = new Hono();
@@ -132,11 +136,11 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     runCommand,
     runSequentialCommands,
     runParallelCommands,
-    // Automations tools
-    createAutomationTool,
-    editAutomationTool,
-    deleteAutomationTool,
-    listAutomationsTool,
+    // Agent tools
+    createAgentTool,
+    editAgentTool,
+    deleteAgentTool,
+    listAgentsTool,
     // Phase 4 tools
     createSiteTool,
     publishSiteTool,
@@ -206,6 +210,15 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     useOneDriveTool,
     useGoogleTasksTool,
     useOutlookTool,
+    // Step 10: New tools
+    proxyLocalServiceTool,
+    serviceDoctorTool,
+    findSimilarLinksTool,
+    imageSearchTool,
+    editFileLlmTool,
+    changeHardwareTool,
+    setActivePersonaTool,
+    updateUserSettingsTool,
   ];
 
   // persist user message

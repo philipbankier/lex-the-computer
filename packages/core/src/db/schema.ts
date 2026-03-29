@@ -30,7 +30,7 @@ export const notifications = pgTable('notifications', {
   user_id: integer('user_id').notNull(),
   title: varchar('title', { length: 255 }).notNull(),
   body: text('body'),
-  type: varchar('type', { length: 32 }).notNull(), // 'automation' | 'channel' | 'system'
+  type: varchar('type', { length: 32 }).notNull(), // 'agent' | 'channel' | 'system'
   read: boolean('read').default(false).notNull(),
   link: text('link'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -77,7 +77,8 @@ export const rules = pgTable('rules', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const automations = pgTable('automations', {
+// Agents (formerly "Automations") — SQL table kept as 'automations' for migration compat
+export const agents = pgTable('automations', {
   id: serial('id').primaryKey(),
   user_id: integer('user_id').notNull(),
   name: varchar('name', { length: 255 }).notNull(),
@@ -91,9 +92,9 @@ export const automations = pgTable('automations', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const automation_runs = pgTable('automation_runs', {
+export const agent_runs = pgTable('automation_runs', {
   id: serial('id').primaryKey(),
-  automation_id: integer('automation_id').notNull(),
+  agent_id: integer('automation_id').notNull(),
   status: varchar('status', { length: 32 }).notNull(),
   output: text('output'),
   error: text('error'),
@@ -306,6 +307,20 @@ export const ai_providers = pgTable('ai_providers', {
   is_authenticated: boolean('is_authenticated').default(false).notNull(),
   config: jsonb('config'), // provider-specific config (API keys for BYOK, model preferences, etc.)
   default_model: text('default_model'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Custom domains for sites, spaces, and services
+export const custom_domains = pgTable('custom_domains', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  domain: text('domain').notNull().unique(),
+  target_type: varchar('target_type', { length: 16 }).notNull(), // 'site' | 'space' | 'service'
+  target_id: integer('target_id'),
+  verified: boolean('verified').default(false).notNull(),
+  verification_token: text('verification_token'),
+  ssl_status: varchar('ssl_status', { length: 16 }).default('pending').notNull(), // 'pending' | 'active' | 'error'
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

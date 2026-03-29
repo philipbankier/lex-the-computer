@@ -12,7 +12,7 @@ searchRouter.get('/', async (c) => {
   const db = await getDb();
   const id = userIdFromCtx();
   const q = c.req.query('q') || '';
-  if (!q.trim()) return c.json({ conversations: [], files: [], automations: [], skills: [] });
+  if (!q.trim()) return c.json({ conversations: [], files: [], agents: [], skills: [] });
 
   const pattern = `%${q}%`;
 
@@ -22,9 +22,9 @@ searchRouter.get('/', async (c) => {
     .orderBy(desc(schema.conversations.updated_at))
     .limit(5);
 
-  // Search automations by name
-  const automations = await db.select().from(schema.automations)
-    .where(and(eq(schema.automations.user_id, id), ilike(schema.automations.name, pattern)))
+  // Search agents by name
+  const agents = await db.select().from(schema.agents)
+    .where(and(eq(schema.agents.user_id, id), ilike(schema.agents.name, pattern)))
     .limit(5);
 
   // Search skills by name
@@ -39,7 +39,7 @@ searchRouter.get('/', async (c) => {
     await searchDir(workDir, q.toLowerCase(), files, env.WORKSPACE_DIR);
   } catch { /* ignore */ }
 
-  return c.json({ conversations, files: files.slice(0, 10), automations, skills });
+  return c.json({ conversations, files: files.slice(0, 10), agents, skills });
 });
 
 async function searchDir(dir: string, query: string, results: { name: string; path: string }[], baseDir: string) {

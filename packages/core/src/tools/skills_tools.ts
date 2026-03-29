@@ -1,23 +1,29 @@
+// Skills tools — filesystem-first with AgentSkills spec compliance
+// Skills live at workspace/Skills/<skill-name>/SKILL.md
+// DB is a cache/index that syncs from filesystem
+
 import { ToolDefinition } from './types.js';
 import { getDb, schema } from '../lib/db.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../lib/env.js';
 
-const skillsBase = () => path.join(env.WORKSPACE_DIR, 'skills');
+// Skills directory: workspace/Skills/ (capital S per AgentSkills spec)
+const skillsBase = () => path.join(env.WORKSPACE_DIR, 'Skills');
 
-export const createSkillTool: ToolDefinition<{ name: string; description?: string }> = {
+export const createSkillTool: ToolDefinition<{ name: string; description?: string; allowed_tools?: string[] }> = {
   name: 'create_skill',
-  description: 'Create a new skill with a directory structure and SKILL.md template',
+  description: 'Create a new skill with a directory structure and SKILL.md template (AgentSkills spec)',
   parameters: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Skill name (display name)' },
       description: { type: 'string', description: 'What this skill does' },
+      allowed_tools: { type: 'array', items: { type: 'string' }, description: 'Tools this skill can use' },
     },
     required: ['name'],
   },
-  async execute({ name, description }) {
+  async execute({ name, description, allowed_tools }) {
     const db = await getDb();
     const user_id = 1;
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -28,6 +34,10 @@ export const createSkillTool: ToolDefinition<{ name: string; description?: strin
     await fs.mkdir(path.join(dir, 'assets'), { recursive: true });
 
     const desc = description || 'A custom skill';
+    const toolsList = allowed_tools && allowed_tools.length > 0
+      ? `[${allowed_tools.join(', ')}]`
+      : '[]';
+
     const skillMd = `---
 name: ${slug}
 description: ${desc}
@@ -38,7 +48,7 @@ metadata:
   version: 1.0.0
   tags: []
   icon: "\u2699\uFE0F"
-allowed-tools: []
+allowed-tools: ${toolsList}
 ---
 
 # ${name}
@@ -47,6 +57,7 @@ Add your skill instructions here.
 `;
     await fs.writeFile(path.join(dir, 'SKILL.md'), skillMd, 'utf8');
 
+    // Sync to DB (cache/index)
     const [row] = await db.insert(schema.skills).values({
       user_id, name, description: desc, author: 'user', version: '1.0.0',
       icon: '\u2699\uFE0F', directory: dir, source: 'local', is_active: true,
@@ -63,6 +74,40 @@ export const listSkillsTool: ToolDefinition<{}> = {
   async execute() {
     const db = await getDb();
     const user_id = 1;
+
+    // Sync from filesystem: scan Skills/ directory for any new skills
+    try {
+      const base = skillsBase();
+      await fs.mkdir(base, { recursive: true });
+      const dirs = await fs.readdir(base, { withFileTypes: true });
+      const dbSkills = await db.select().from(schema.skills).where({ user_id } as any);
+      const dbDirs = new Set(dbSkills.map(s => s.directory));
+
+      for (const entry of dirs) {
+        if (!entry.isDirectory()) continue;
+        const dir = path.join(base, entry.name);
+        if (dbDirs.has(dir)) continue;
+
+        // Found a skill on disk not in DB — sync it
+        const skillMdPath = path.join(dir, 'SKILL.md');
+        try {
+          const content = await fs.readFile(skillMdPath, 'utf8');
+          const { parseSkillMd } = await import('../services/skill-loader.js');
+          const { frontmatter } = parseSkillMd(content);
+          await db.insert(schema.skills).values({
+            user_id, name: frontmatter.name || entry.name,
+            description: frontmatter.description || '',
+            author: frontmatter.metadata?.author || 'user',
+            version: frontmatter.metadata?.version || '1.0.0',
+            icon: frontmatter.metadata?.icon || '\u2699\uFE0F',
+            directory: dir, source: 'local', is_active: true,
+          } as any);
+        } catch {
+          // No valid SKILL.md, skip
+        }
+      }
+    } catch {}
+
     const rows = await db.select().from(schema.skills).where({ user_id } as any);
     return {
       skills: rows.map((r) => ({
@@ -136,7 +181,7 @@ export const toggleSkillTool: ToolDefinition<{ id?: number; name?: string; activ
 
 export const installHubSkillTool: ToolDefinition<{ hub_skill_id?: number; name?: string }> = {
   name: 'install_hub_skill',
-  description: 'Install a skill from the Skills Hub',
+  description: 'Install a skill from the Skills Hub to workspace/Skills/ directory',
   parameters: {
     type: 'object',
     properties: {
@@ -157,10 +202,10 @@ export const installHubSkillTool: ToolDefinition<{ hub_skill_id?: number; name?:
     }
     if (!hubSkill) return { error: 'Hub skill not found' };
 
-    // Check already installed
     const existing = (await db.select().from(schema.skills).where({ user_id, hub_id: hubSkill.id } as any).limit(1))[0];
     if (existing) return { error: 'Already installed', skill: existing };
 
+    // Install to workspace/Skills/ directory
     const slug = hubSkill.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const dir = path.join(skillsBase(), slug);
     await fs.mkdir(dir, { recursive: true });
@@ -184,7 +229,7 @@ export const installHubSkillTool: ToolDefinition<{ hub_skill_id?: number; name?:
 
 export const uninstallSkillTool: ToolDefinition<{ id?: number; name?: string }> = {
   name: 'uninstall_skill',
-  description: 'Uninstall a skill (removes directory and database record)',
+  description: 'Uninstall a skill (removes from workspace/Skills/ directory and database)',
   parameters: {
     type: 'object',
     properties: {
@@ -204,9 +249,11 @@ export const uninstallSkillTool: ToolDefinition<{ id?: number; name?: string }> 
     }
     if (!row) return { error: 'Skill not found' };
 
+    // Remove from filesystem
     if (row.directory) {
       try { await fs.rm(row.directory, { recursive: true, force: true }); } catch {}
     }
+    // Remove from DB cache
     await db.delete(schema.skills).where({ id: row.id } as any);
     return { ok: true };
   },

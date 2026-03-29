@@ -6,7 +6,7 @@ const primary = [
   { title: 'Home', href: '/home' },
   { title: 'Files', href: '/files' },
   { title: 'Chats', href: '/chats' },
-  { title: 'Automations', href: '/automations' },
+  { title: 'Agents', href: '/agents' },
   { title: 'Space', href: '/space' },
   { title: 'Skills', href: '/skills' },
 ];

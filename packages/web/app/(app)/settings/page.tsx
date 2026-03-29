@@ -59,6 +59,7 @@ export default function SettingsShell() {
         <div className="grid gap-3">
           <SecretsSection />
           <ApiKeysSection />
+          <DomainsSection />
           <SSHSection />
           <Section title="Danger Zone">
             <button className="px-2 py-1 text-sm rounded bg-red-600/80">Delete account</button>
@@ -832,6 +833,77 @@ function KeybindingsSection() {
           <div key={kb.action} className="flex items-center justify-between p-1.5 rounded hover:bg-white/5">
             <span className="text-sm">{kb.action}</span>
             <kbd className="px-2 py-0.5 text-xs rounded bg-white/10 font-mono">{kb.shortcut}</kbd>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function DomainsSection() {
+  const [domains, setDomains] = useState<any[]>([]);
+  const [newDomain, setNewDomain] = useState('');
+  const [targetType, setTargetType] = useState('site');
+  const [dnsInfo, setDnsInfo] = useState<any>(null);
+
+  useState(() => { void refreshDomains(); });
+  async function refreshDomains() { const r = await fetch(`${CORE_URL}/api/domains`); setDomains(await r.json()); }
+
+  async function addDomain() {
+    if (!newDomain) return;
+    const res = await fetch(`${CORE_URL}/api/domains`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain: newDomain, target_type: targetType }) });
+    const data = await res.json();
+    setDnsInfo(data.dns_instructions);
+    setNewDomain('');
+    await refreshDomains();
+  }
+
+  async function verifyDomain(id: number) {
+    const res = await fetch(`${CORE_URL}/api/domains/${id}/verify`, { method: 'POST' });
+    const data = await res.json();
+    if (data.verified) {
+      await refreshDomains();
+      setDnsInfo(null);
+    } else {
+      setDnsInfo(data);
+    }
+  }
+
+  async function removeDomain(id: number) {
+    await fetch(`${CORE_URL}/api/domains/${id}`, { method: 'DELETE' });
+    await refreshDomains();
+  }
+
+  return (
+    <Section title="Custom Domains">
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <input value={newDomain} onChange={(e) => setNewDomain(e.target.value)} placeholder="example.com" className="flex-1 px-2 py-1 text-sm rounded bg-black/40 border border-white/10" />
+          <select value={targetType} onChange={(e) => setTargetType(e.target.value)} className="px-2 py-1 text-sm rounded bg-black/40 border border-white/10">
+            <option value="site">Site</option>
+            <option value="space">Space</option>
+            <option value="service">Service</option>
+          </select>
+          <button onClick={addDomain} className="px-2 py-1 text-sm rounded bg-white/10">Add</button>
+        </div>
+        {dnsInfo && (
+          <div className="p-2 rounded bg-blue-500/10 text-xs space-y-1">
+            <div className="font-medium">DNS Configuration Required:</div>
+            {dnsInfo.cname && <div>CNAME: {dnsInfo.cname.name} → {dnsInfo.cname.value}</div>}
+            {dnsInfo.txt && <div>TXT: {dnsInfo.txt.name} = {dnsInfo.txt.value}</div>}
+            {dnsInfo.expected_record && <div>Expected TXT: {dnsInfo.expected_record.name} = {dnsInfo.expected_record.value}</div>}
+          </div>
+        )}
+        {domains.map((d: any) => (
+          <div key={d.id} className="flex items-center justify-between p-2 rounded bg-black/20">
+            <div>
+              <div className="text-sm font-medium">{d.domain}</div>
+              <div className="text-xs opacity-60">{d.target_type} · {d.verified ? 'Verified' : 'Pending'} · SSL: {d.ssl_status}</div>
+            </div>
+            <div className="flex gap-2">
+              {!d.verified && <button onClick={() => verifyDomain(d.id)} className="px-2 py-1 text-xs rounded bg-white/10">Verify</button>}
+              <button onClick={() => removeDomain(d.id)} className="px-2 py-1 text-xs rounded bg-red-500/20 text-red-300">Remove</button>
+            </div>
           </div>
         ))}
       </div>

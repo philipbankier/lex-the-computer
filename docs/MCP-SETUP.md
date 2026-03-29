@@ -1,20 +1,55 @@
-# MCP Server Setup Guide
+# MCP Setup — Lex the Computer
 
-Lex exposes all its tools via the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). This allows external AI tools like Claude Code, Cursor, Gemini CLI, and others to use Lex's capabilities directly.
+Lex exposes all its tools via the [Model Context Protocol](https://modelcontextprotocol.io) (MCP) at `/mcp`.
 
 ## Prerequisites
 
-1. Lex is running (default: `http://localhost:3001`)
-2. You have an API key (create one in Settings > Advanced > API Keys)
+1. Lex core server running (default: `http://localhost:3001`)
+2. An API key created in **Settings > API Keys**
 
 ## Endpoint
 
-- **URL**: `http://localhost:3001/mcp` (or `https://yourdomain.com/mcp` if deployed)
-- **Auth**: API key in `Authorization: Bearer` header
+```
+POST http://localhost:3001/mcp
+Authorization: Bearer lex_your_api_key
+```
 
-## Configuration Examples
+Transport: **Streamable HTTP** (MCP spec 2025-11-25). Falls back to built-in JSON-RPC if `@modelcontextprotocol/sdk` is not installed.
 
-### Claude Code (`~/.claude.json`)
+---
+
+## Client Configuration
+
+### Claude Code
+
+```bash
+claude mcp add --transport http lex http://localhost:3001/mcp \
+  --header "Authorization: Bearer lex_your_api_key"
+```
+
+### Claude Desktop
+
+Edit `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "lex": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "http://localhost:3001/mcp",
+        "--header",
+        "Authorization: Bearer lex_your_api_key"
+      ]
+    }
+  }
+}
+```
+
+### Cursor
+
+Edit `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -22,147 +57,136 @@ Lex exposes all its tools via the [Model Context Protocol](https://modelcontextp
     "lex": {
       "url": "http://localhost:3001/mcp",
       "headers": {
-        "Authorization": "Bearer lex_your_api_key_here"
+        "Authorization": "Bearer lex_your_api_key"
       }
     }
   }
 }
 ```
 
-### Cursor (`.cursor/mcp.json`)
+### Zed
 
-```json
-{
-  "mcpServers": {
-    "lex": {
-      "url": "http://localhost:3001/mcp",
-      "headers": {
-        "Authorization": "Bearer lex_your_api_key_here"
-      }
-    }
-  }
-}
-```
-
-### Gemini CLI (`~/.gemini/settings.json`)
-
-```json
-{
-  "mcpServers": {
-    "lex": {
-      "httpUrl": "http://localhost:3001/mcp",
-      "headers": {
-        "Authorization": "Bearer lex_your_api_key_here"
-      }
-    }
-  }
-}
-```
-
-### Zed (`settings.json`)
+Edit `settings.json`:
 
 ```json
 {
   "context_servers": {
     "lex": {
-      "settings": {
-        "url": "http://localhost:3001/mcp",
-        "headers": {
-          "Authorization": "Bearer lex_your_api_key_here"
-        }
+      "url": "http://localhost:3001/mcp",
+      "headers": {
+        "Authorization": "Bearer lex_your_api_key"
       }
     }
   }
 }
 ```
 
-### OpenCode (`opencode.json`)
+### OpenCode
+
+Edit `opencode.json`:
 
 ```json
 {
   "mcp": {
     "lex": {
-      "type": "http",
+      "type": "remote",
       "url": "http://localhost:3001/mcp",
       "headers": {
-        "Authorization": "Bearer lex_your_api_key_here"
+        "Authorization": "Bearer lex_your_api_key"
       }
     }
   }
 }
 ```
 
+### Gemini CLI
+
+Edit `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "lex": {
+      "url": "http://localhost:3001/mcp",
+      "headers": {
+        "Authorization": "Bearer lex_your_api_key"
+      }
+    }
+  }
+}
+```
+
+---
+
 ## Available Tools
 
-The MCP server exposes all Lex tools, including:
+All Lex tools are exposed via MCP, including:
 
-### Core Tools
-- `web_search` — Search the web
-- `read_webpage` — Read a webpage
-- `save_webpage` — Save a webpage as markdown
-- `create_file`, `edit_file`, `list_files`, `search_files` — File operations
+### Core
+- `web_search`, `read_webpage`, `save_webpage` — Web search & scraping
+- `find_similar_links` — Find pages similar to a URL
+- `image_search` — Search for images on the web
+- `create_file`, `edit_file`, `edit_file_llm`, `list_files`, `search_files` — File operations
 - `run_command`, `run_sequential_commands`, `run_parallel_commands` — Shell commands
 
-### Automations
-- `create_automation`, `edit_automation`, `delete_automation`, `list_automations`
+### Browser
+- `browse_web` — Navigate, screenshot, click, type, extract, evaluate, AI interact (Stagehand)
+- `browser_session` — Manage browser sessions
+
+### Agents
+- `create_agent`, `edit_agent`, `delete_agent`, `list_agents`
 
 ### Sites & Services
 - `create_site`, `publish_site`, `unpublish_site`
 - `register_service`, `update_service`, `delete_service`, `list_services`
+- `proxy_local_service` — Expose local services publicly (like ngrok)
+- `service_doctor` — AI-powered service diagnostics
 
-### Space (Personal Domain)
+### Space
 - `create_space_route`, `edit_space_route`, `delete_space_route`, `list_space_routes`
-- Asset and settings management tools
+- Asset, settings, error, and version management tools
 
 ### Skills
-- `create_skill`, `list_skills`, `install_hub_skill`, `uninstall_skill`
+- `create_skill`, `list_skills`, `get_skill`, `toggle_skill`
+- `install_hub_skill`, `uninstall_skill`, `search_hub_skills`
 
 ### Integrations
-- `use_gmail`, `use_calendar`, `use_notion`, `use_drive`, `use_dropbox`, `use_linear`, `use_github`
-- `use_airtable`, `use_spotify`, `use_onedrive`, `use_google_tasks`, `use_outlook`
-- `list_app_tools` — List all connected integrations
+- `use_gmail`, `use_calendar`, `use_notion`, `use_drive`, `use_dropbox`
+- `use_linear`, `use_github`, `use_airtable`, `use_spotify`
+- `use_onedrive`, `use_google_tasks`, `use_outlook`
+- `list_app_tools`
 
 ### Channels
 - `send_telegram`, `send_email`, `send_discord`, `send_sms`
 
-### Browser (Phase 10)
-- `browse_web` — Navigate, screenshot, click, type, extract, evaluate
-- `browser_session` — Manage browser sessions
-
-### Media (Phase 10)
-- `generate_image` — Generate images (DALL-E, Stability AI, Replicate)
-- `edit_image` — Edit images, remove backgrounds, upscale
-- `transcribe_audio` — Transcribe audio files (Whisper)
-- `transcribe_video` — Transcribe video files
-- `generate_video` — Generate short video clips from images
-- `create_diagram` — Generate diagrams from D2 code
-- `describe_diagram` — Generate diagrams from natural language
-
-### Maps
-- `search_maps` — Search places, get details, get directions
+### Media
+- `generate_image`, `edit_image` — fal.ai image generation/editing
+- `generate_video` — fal.ai video generation
+- `transcribe_audio`, `transcribe_video` — Groq Whisper transcription
+- `create_diagram`, `describe_diagram` — D2 diagrams
 
 ### SSH
-- `ssh_exec` — Execute commands on remote hosts
-- `ssh_upload` — Upload files to remote hosts
-- `ssh_download` — Download files from remote hosts
+- `ssh_exec`, `ssh_upload`, `ssh_download`
+
+### System
+- `search_maps` — Google Maps search
+- `change_hardware` — View/configure hardware resources
+- `set_active_persona` — Set persona per channel
+- `update_user_settings` — Update user profile via tool
 
 ## Resources
 
-The MCP server also exposes resources:
-
-- `lex://files/{filename}` — Read workspace files
-- `lex://conversations/{id}` — Read conversation history
+- `lex://files/{filename}` — Workspace files
+- `lex://conversations/{id}` — Chat history
 
 ## Testing
-
-You can test the MCP endpoint with curl:
 
 ```bash
 # Initialize
 curl -X POST http://localhost:3001/mcp \
   -H "Authorization: Bearer lex_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}}}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}'
 
 # List tools
 curl -X POST http://localhost:3001/mcp \

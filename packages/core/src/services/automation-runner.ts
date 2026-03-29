@@ -47,27 +47,26 @@ const toolDefs = [
   restartSpaceServerTool,
 ];
 
-export async function runAutomation(automationId: number) {
+export async function runAgent(agentId: number) {
   const db = await getDb();
-  const automation = (await db.select().from(schema.automations).where({ id: automationId } as any).limit(1))[0];
-  if (!automation) return;
+  const agent = (await db.select().from(schema.agents).where({ id: agentId } as any).limit(1))[0];
+  if (!agent) return;
 
   // Create run record
   const [run] = await db
-    .insert(schema.automation_runs)
-    .values({ automation_id: automationId, status: 'running', started_at: new Date() } as any)
+    .insert(schema.agent_runs)
+    .values({ agent_id: agentId, status: 'running', started_at: new Date() } as any)
     .returning();
 
   try {
-    const userId = automation.user_id;
+    const userId = agent.user_id;
     const systemPrompt = await buildSystemPrompt(userId, {
-      // No persona override in schema for now
       tools: toolDefs.map((t) => ({ name: t.name, description: t.description })),
     });
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: automation.instruction || '' },
+      { role: 'user', content: agent.instruction || '' },
     ];
     const toolSpecs: ToolSpec[] = toolDefs.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } }));
 
@@ -76,13 +75,12 @@ export async function runAutomation(automationId: number) {
     let loop = 0;
     while (loop < 5) {
       loop++;
-      const resp = await chatCompletion({ model: automation.model || 'gpt-4o-mini', messages, tools: toolSpecs, tool_choice: 'auto' });
+      const resp = await chatCompletion({ model: agent.model || 'gpt-4o-mini', messages, tools: toolSpecs, tool_choice: 'auto' });
       const choice = resp?.choices?.[0];
       const msg = choice?.message || {};
       const content = msg.content || '';
       const toolCalls = msg.tool_calls || msg.toolCalls || null;
       if (toolCalls && Array.isArray(toolCalls) && toolCalls.length) {
-        // Execute tool calls sequentially and push tool results
         for (const call of toolCalls) {
           const fnName = call.function?.name || call.name;
           const argsRaw = call.function?.arguments || call.arguments || '{}';
@@ -100,53 +98,48 @@ export async function runAutomation(automationId: number) {
             messages.push({ role: 'tool', name: fnName, tool_call_id: call.id || undefined, content: `Error: ${String(err?.message || err)}` });
           }
         }
-        // Continue the loop for model to use tool results
         continue;
       }
-      // No tools; take content as final
       output = content;
       break;
     }
 
     // Save output and mark success
     await db
-      .update(schema.automation_runs)
+      .update(schema.agent_runs)
       .set({ status: 'success', output, completed_at: new Date() } as any)
       .where({ id: run.id } as any);
 
-    // Deliver to chat: create a conversation and add assistant message
+    // Deliver to chat
     const [conv] = await db
       .insert(schema.conversations)
-      .values({ user_id: userId, title: automation.name || 'Automation Run', model: automation.model || 'gpt-4o-mini', persona_id: null } as any)
+      .values({ user_id: userId, title: agent.name || 'Agent Run', model: agent.model || 'gpt-4o-mini', persona_id: null } as any)
       .returning();
-    await db.insert(schema.messages).values({ conversation_id: conv.id, role: 'assistant', content: output, model: automation.model || 'gpt-4o-mini' } as any);
+    await db.insert(schema.messages).values({ conversation_id: conv.id, role: 'assistant', content: output, model: agent.model || 'gpt-4o-mini' } as any);
 
-    // Phase 8: Deliver via channels based on delivery field
-    // delivery can be: 'chat', 'email', 'telegram', 'discord', 'sms', or comma-separated
-    const deliveryMethods = (automation.delivery || 'chat').split(',').map((d: string) => d.trim());
+    // Deliver via channels
+    const deliveryMethods = (agent.delivery || 'chat').split(',').map((d: string) => d.trim());
     for (const method of deliveryMethods) {
-      if (method === 'chat') continue; // Already delivered above
+      if (method === 'chat') continue;
       try {
         const plugin = getChannel(method);
         if (!plugin || !plugin.isConfigured()) continue;
-        // Find user's channel for this type
         const userChannels = await db.select().from(schema.channels)
           .where({ user_id: userId, type: method, is_active: true } as any);
         for (const ch of userChannels) {
-          await plugin.sendMessage(ch.id, `[${automation.name}]\n\n${output}`);
+          await plugin.sendMessage(ch.id, `[${agent.name}]\n\n${output}`);
         }
       } catch (err: any) {
-        console.error(`Automation delivery via ${method} failed:`, err?.message);
+        console.error(`Agent delivery via ${method} failed:`, err?.message);
       }
     }
 
     // Update last_run
-    await db.update(schema.automations).set({ last_run: new Date() } as any).where({ id: automationId } as any);
+    await db.update(schema.agents).set({ last_run: new Date() } as any).where({ id: agentId } as any);
   } catch (err: any) {
     await db
-      .update(schema.automation_runs)
+      .update(schema.agent_runs)
       .set({ status: 'error', error: String(err?.message || err), completed_at: new Date() } as any)
       .where({ id: run.id } as any);
   }
 }
-
