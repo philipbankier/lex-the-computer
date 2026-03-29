@@ -11,6 +11,12 @@ import { searchFilesTool } from '../tools/search_files.js';
 import { runCommand } from '../tools/run_command.js';
 import { runSequentialCommands } from '../tools/run_sequential_commands.js';
 import { runParallelCommands } from '../tools/run_parallel_commands.js';
+import {
+  createSpaceRouteTool, editSpaceRouteTool, deleteSpaceRouteTool, listSpaceRoutesTool,
+  getSpaceRouteTool, getSpaceRouteHistoryTool, undoSpaceRouteTool, redoSpaceRouteTool,
+  uploadSpaceAssetTool, deleteSpaceAssetTool, listSpaceAssetsTool,
+  getSpaceErrorsTool, getSpaceSettingsTool, updateSpaceSettingsTool, restartSpaceServerTool,
+} from '../tools/space_tools.js';
 
 const toolDefs = [
   webSearch,
@@ -23,6 +29,21 @@ const toolDefs = [
   runCommand,
   runSequentialCommands,
   runParallelCommands,
+  createSpaceRouteTool,
+  editSpaceRouteTool,
+  deleteSpaceRouteTool,
+  listSpaceRoutesTool,
+  getSpaceRouteTool,
+  getSpaceRouteHistoryTool,
+  undoSpaceRouteTool,
+  redoSpaceRouteTool,
+  uploadSpaceAssetTool,
+  deleteSpaceAssetTool,
+  listSpaceAssetsTool,
+  getSpaceErrorsTool,
+  getSpaceSettingsTool,
+  updateSpaceSettingsTool,
+  restartSpaceServerTool,
 ];
 
 export async function runAutomation(automationId: number) {

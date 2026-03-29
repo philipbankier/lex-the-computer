@@ -18,6 +18,7 @@ import { servicesRouter } from './routes/services.js';
 import { secretsRouter } from './routes/secrets.js';
 import { terminalRouter } from './routes/terminal.js';
 import { automationsRouter } from './routes/automations.js';
+import { spaceRouter, spacePublicRouter } from './routes/space.js';
 
 const app = new Hono();
 app.use('*', cors());
@@ -46,6 +47,9 @@ app.route('/api/automations', automationsRouter);
 app.route('/api/sites', sitesRouter);
 app.route('/api/services', servicesRouter);
 app.route('/api/secrets', secretsRouter);
+app.route('/api/space', spaceRouter);
+app.route('/public/space', spacePublicRouter);
+app.route('/space', spacePublicRouter);
 
 app.get('/api/skills', notImplemented);
 app.get('/api/skills/hub', notImplemented);
@@ -57,7 +61,7 @@ app.get('/api/system/stats', notImplemented);
 
 async function ensureWorkspace() {
   const base = env.WORKSPACE_DIR;
-  const subdirs = ['files', 'sites', 'skills', 'articles', '.config'];
+  const subdirs = ['files', 'sites', 'skills', 'articles', '.config', 'space-assets'];
   try {
     await fs.mkdir(base, { recursive: true });
     await Promise.all(subdirs.map((d) => fs.mkdir(path.join(base, d), { recursive: true })));

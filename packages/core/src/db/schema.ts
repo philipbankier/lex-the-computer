@@ -137,6 +137,55 @@ export const datasets = pgTable('datasets', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Phase 5: Space tables
+export const space_routes = pgTable('space_routes', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  path: text('path').notNull(),
+  type: varchar('type', { length: 8 }).notNull(), // 'page' | 'api'
+  code: text('code').notNull(),
+  is_public: boolean('is_public').default(false).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const space_route_versions = pgTable('space_route_versions', {
+  id: serial('id').primaryKey(),
+  route_id: integer('route_id').notNull(),
+  code: text('code').notNull(),
+  version: integer('version').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const space_assets = pgTable('space_assets', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  filename: text('filename').notNull(),
+  path: text('path').notNull(),
+  mime_type: varchar('mime_type', { length: 255 }),
+  size: integer('size'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const space_settings = pgTable('space_settings', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull(),
+  handle: varchar('handle', { length: 64 }),
+  title: varchar('title', { length: 255 }),
+  description: text('description'),
+  favicon: text('favicon'),
+  custom_css: text('custom_css'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const space_errors = pgTable('space_errors', {
+  id: serial('id').primaryKey(),
+  route_id: integer('route_id').notNull(),
+  error: text('error').notNull(),
+  stack: text('stack'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Phase 4a: Services table
 export const services = pgTable('services', {
   id: serial('id').primaryKey(),

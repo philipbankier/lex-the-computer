@@ -20,6 +20,12 @@ import { listAutomationsTool } from '../tools/list_automations.js';
 import { createSiteTool } from '../tools/create_site.js';
 import { publishSiteTool, unpublishSiteTool } from '../tools/publish_site.js';
 import { registerServiceTool, updateServiceTool, deleteServiceTool, listServicesTool } from '../tools/services_tools.js';
+import {
+  createSpaceRouteTool, editSpaceRouteTool, deleteSpaceRouteTool, listSpaceRoutesTool,
+  getSpaceRouteTool, getSpaceRouteHistoryTool, undoSpaceRouteTool, redoSpaceRouteTool,
+  uploadSpaceAssetTool, deleteSpaceAssetTool, listSpaceAssetsTool,
+  getSpaceErrorsTool, getSpaceSettingsTool, updateSpaceSettingsTool, restartSpaceServerTool,
+} from '../tools/space_tools.js';
 
 export const chatRouter = new Hono();
 
@@ -119,6 +125,22 @@ chatRouter.post('/conversations/:id/messages', async (c) => {
     updateServiceTool,
     deleteServiceTool,
     listServicesTool,
+    // Phase 5 Space tools
+    createSpaceRouteTool,
+    editSpaceRouteTool,
+    deleteSpaceRouteTool,
+    listSpaceRoutesTool,
+    getSpaceRouteTool,
+    getSpaceRouteHistoryTool,
+    undoSpaceRouteTool,
+    redoSpaceRouteTool,
+    uploadSpaceAssetTool,
+    deleteSpaceAssetTool,
+    listSpaceAssetsTool,
+    getSpaceErrorsTool,
+    getSpaceSettingsTool,
+    updateSpaceSettingsTool,
+    restartSpaceServerTool,
   ];
 
   // persist user message
