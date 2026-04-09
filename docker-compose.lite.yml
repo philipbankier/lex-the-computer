@@ -1,0 +1,10 @@
+# Lite mode: excludes Honcho services for Core memory users.
+# Usage: docker compose -f docker-compose.v2.yml -f docker-compose.lite.yml up
+
+services:
+  honcho-api:
+    deploy:
+      replicas: 0
+  honcho-deriver:
+    deploy:
+      replicas: 0
