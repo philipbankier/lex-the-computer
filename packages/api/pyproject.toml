@@ -21,6 +21,7 @@ dependencies = [
     "stripe>=11.0",
     "docker>=7.1",
     "aiofiles>=24.1",
+    "psutil>=6.0",
     "python-dotenv>=1.0",
 ]
 
