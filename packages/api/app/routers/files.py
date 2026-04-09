@@ -87,7 +87,7 @@ async def rename_file(body: FileRename, user: User = Depends(get_current_user)):
     src = safe_resolve(body.path)
     dest = safe_resolve(body.newPath)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    src.rename(dest)
+    await asyncio.to_thread(src.rename, dest)
     return {"ok": True}
 
 

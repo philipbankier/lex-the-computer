@@ -35,7 +35,7 @@ async def list_datasets(user: User = Depends(get_current_user), db: AsyncSession
 
 
 @router.get("/{dataset_id}")
-async def get_dataset(dataset_id: int, db: AsyncSession = Depends(get_db)):
+async def get_dataset(dataset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
     ds = result.scalar_one_or_none()
     if not ds:
@@ -83,7 +83,7 @@ async def create_dataset(body: DatasetCreate, user: User = Depends(get_current_u
 
 
 @router.delete("/{dataset_id}")
-async def delete_dataset(dataset_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_dataset(dataset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
     ds = result.scalar_one_or_none()
     if not ds:
@@ -96,7 +96,7 @@ async def delete_dataset(dataset_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{dataset_id}/query")
-async def run_query(dataset_id: int, body: QueryRequest, db: AsyncSession = Depends(get_db)):
+async def run_query(dataset_id: int, body: QueryRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
     ds = result.scalar_one_or_none()
     if not ds:
@@ -112,7 +112,7 @@ async def run_query(dataset_id: int, body: QueryRequest, db: AsyncSession = Depe
 
 
 @router.get("/{dataset_id}/preview")
-async def preview_dataset(dataset_id: int, db: AsyncSession = Depends(get_db)):
+async def preview_dataset(dataset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
     ds = result.scalar_one_or_none()
     if not ds:

@@ -49,7 +49,7 @@ async def list_services(user: User = Depends(get_current_user), db: AsyncSession
 
 
 @router.get("/{service_id}")
-async def get_service(service_id: int, db: AsyncSession = Depends(get_db)):
+async def get_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Service).where(Service.id == service_id).limit(1))
     svc = result.scalar_one_or_none()
     if not svc:
@@ -58,7 +58,7 @@ async def get_service(service_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{service_id}")
-async def update_service(service_id: int, body: ServiceUpdate, db: AsyncSession = Depends(get_db)):
+async def update_service(service_id: int, body: ServiceUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Service).where(Service.id == service_id).limit(1))
     svc = result.scalar_one_or_none()
     if not svc:
@@ -73,7 +73,7 @@ async def update_service(service_id: int, body: ServiceUpdate, db: AsyncSession 
 
 
 @router.delete("/{service_id}")
-async def delete_service(service_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await db.execute(delete(Service).where(Service.id == service_id))
     await db.commit()
     return {"ok": True}
@@ -81,20 +81,20 @@ async def delete_service(service_id: int, db: AsyncSession = Depends(get_db)):
 
 # Lifecycle stubs — will be implemented in service_runner.py
 @router.post("/{service_id}/start")
-async def start_service(service_id: int):
+async def start_service(service_id: int, user: User = Depends(get_current_user)):
     return {"ok": True, "status": "started"}
 
 
 @router.post("/{service_id}/stop")
-async def stop_service(service_id: int):
+async def stop_service(service_id: int, user: User = Depends(get_current_user)):
     return {"ok": True, "status": "stopped"}
 
 
 @router.post("/{service_id}/restart")
-async def restart_service(service_id: int):
+async def restart_service(service_id: int, user: User = Depends(get_current_user)):
     return {"ok": True, "status": "restarted"}
 
 
 @router.get("/{service_id}/logs")
-async def get_service_logs(service_id: int):
+async def get_service_logs(service_id: int, user: User = Depends(get_current_user)):
     return {"lines": []}

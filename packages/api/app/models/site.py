@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -8,7 +8,7 @@ class Site(Base):
     __tablename__ = "sites"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     slug = Column(String(64), nullable=False)
     framework = Column(String(64))

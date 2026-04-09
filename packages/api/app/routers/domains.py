@@ -56,7 +56,7 @@ async def list_domains(user: User = Depends(get_current_user), db: AsyncSession 
 
 
 @router.post("/{domain_id}/verify")
-async def verify_domain(domain_id: int, db: AsyncSession = Depends(get_db)):
+async def verify_domain(domain_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CustomDomain).where(CustomDomain.id == domain_id).limit(1))
     dom = result.scalar_one_or_none()
     if not dom:
@@ -91,7 +91,7 @@ async def verify_domain(domain_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{domain_id}")
-async def delete_domain(domain_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_domain(domain_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(CustomDomain).where(CustomDomain.id == domain_id).limit(1))
     dom = result.scalar_one_or_none()
     if dom:

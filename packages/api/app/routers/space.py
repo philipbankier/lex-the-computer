@@ -65,7 +65,7 @@ async def create_route(body: RouteCreate, user: User = Depends(get_current_user)
 
 
 @router.get("/routes/{route_id}")
-async def get_route(route_id: int, db: AsyncSession = Depends(get_db)):
+async def get_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
     route = result.scalar_one_or_none()
     if not route:
@@ -102,7 +102,7 @@ async def update_route(route_id: int, body: RouteUpdate, user: User = Depends(ge
 
 
 @router.delete("/routes/{route_id}")
-async def delete_route(route_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await db.execute(delete(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id))
     await db.execute(delete(SpaceError).where(SpaceError.route_id == route_id))
     await db.execute(delete(SpaceRoute).where(SpaceRoute.id == route_id))
@@ -114,7 +114,7 @@ async def delete_route(route_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/routes/{route_id}/history")
-async def route_history(route_id: int, db: AsyncSession = Depends(get_db)):
+async def route_history(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id).order_by(SpaceRouteVersion.version)
     )
@@ -122,7 +122,7 @@ async def route_history(route_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/routes/{route_id}/undo")
-async def undo_route(route_id: int, db: AsyncSession = Depends(get_db)):
+async def undo_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
     route = result.scalar_one_or_none()
     if not route:
@@ -144,7 +144,7 @@ async def undo_route(route_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/routes/{route_id}/redo")
-async def redo_route(route_id: int, db: AsyncSession = Depends(get_db)):
+async def redo_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
     route = result.scalar_one_or_none()
     if not route:
@@ -224,7 +224,7 @@ async def upload_asset(
 
 
 @router.delete("/assets/{asset_id}")
-async def delete_asset(asset_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_asset(asset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SpaceAsset).where(SpaceAsset.id == asset_id).limit(1))
     asset = result.scalar_one_or_none()
     if asset:
@@ -275,7 +275,7 @@ async def update_settings(body: SpaceSettingsUpdate, user: User = Depends(get_cu
 
 
 @router.get("/errors")
-async def list_errors(db: AsyncSession = Depends(get_db)):
+async def list_errors(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(SpaceError).order_by(SpaceError.created_at.desc()).limit(100))
     return result.scalars().all()
 

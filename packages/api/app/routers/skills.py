@@ -33,7 +33,7 @@ async def list_skills(user: User = Depends(get_current_user), db: AsyncSession =
 
 
 @router.get("/{skill_id}")
-async def get_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
+async def get_skill(skill_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Skill).where(Skill.id == skill_id).limit(1))
     skill = result.scalar_one_or_none()
     if not skill:
@@ -92,7 +92,7 @@ Add your skill instructions here. The AI will follow these instructions when thi
 
 
 @router.put("/{skill_id}/toggle")
-async def toggle_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
+async def toggle_skill(skill_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Skill).where(Skill.id == skill_id).limit(1))
     skill = result.scalar_one_or_none()
     if not skill:
@@ -104,7 +104,7 @@ async def toggle_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{skill_id}")
-async def delete_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_skill(skill_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Skill).where(Skill.id == skill_id).limit(1))
     skill = result.scalar_one_or_none()
     if not skill:
@@ -117,7 +117,7 @@ async def delete_skill(skill_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{skill_id}/files")
-async def list_skill_files(skill_id: int, db: AsyncSession = Depends(get_db)):
+async def list_skill_files(skill_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Skill).where(Skill.id == skill_id).limit(1))
     skill = result.scalar_one_or_none()
     if not skill or not skill.directory:

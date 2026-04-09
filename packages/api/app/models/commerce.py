@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -8,7 +8,7 @@ class StripeAccount(Base):
     __tablename__ = "stripe_accounts"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     stripe_account_id = Column(Text, nullable=False)
     country = Column(String(8))
     onboarding_complete = Column(Boolean, default=False, nullable=False)
@@ -22,7 +22,7 @@ class StripeProduct(Base):
     __tablename__ = "stripe_products"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     stripe_product_id = Column(Text, nullable=False)
     name = Column(Text, nullable=False)
     description = Column(Text)
@@ -34,7 +34,7 @@ class StripePrice(Base):
     __tablename__ = "stripe_prices"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("stripe_products.id"), nullable=False, index=True)
     stripe_price_id = Column(Text, nullable=False)
     amount = Column(Integer, nullable=False)  # cents
     currency = Column(String(8), default="usd", nullable=False)
@@ -47,7 +47,7 @@ class StripePaymentLink(Base):
     __tablename__ = "stripe_payment_links"
 
     id = Column(Integer, primary_key=True, index=True)
-    price_id = Column(Integer, nullable=False, index=True)
+    price_id = Column(Integer, ForeignKey("stripe_prices.id"), nullable=False, index=True)
     stripe_payment_link_id = Column(Text, nullable=False)
     url = Column(Text, nullable=False)
     active = Column(Boolean, default=True, nullable=False)
@@ -58,14 +58,14 @@ class StripeOrder(Base):
     __tablename__ = "stripe_orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
-    stripe_session_id = Column(Text)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    stripe_session_id = Column(Text, nullable=False)
     product_name = Column(Text)
     amount = Column(Integer)
     currency = Column(String(8))
     customer_email = Column(Text)
-    payment_status = Column(String(32))
-    fulfillment_status = Column(String(32))
+    payment_status = Column(String(16), default="pending", nullable=False)
+    fulfillment_status = Column(String(16), default="unfulfilled", nullable=False)
     paid_at = Column(DateTime(timezone=True))
     fulfilled_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

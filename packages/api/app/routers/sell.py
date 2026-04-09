@@ -268,7 +268,7 @@ async def list_payment_links(user: User = Depends(get_current_user), db: AsyncSe
         prices = (await db.execute(select(StripePrice).where(StripePrice.product_id == p.id))).scalars().all()
         for pr in prices:
             pls = (await db.execute(select(StripePaymentLink).where(StripePaymentLink.price_id == pr.id))).scalars().all()
-            links.extend({"productName": p.name, "amount": pr.amount, "currency": pr.currency, **pl.__dict__} for pl in pls)
+            links.extend([{"productName": p.name, "amount": pr.amount, "currency": pr.currency, **pl.__dict__} for pl in pls])
     return links
 
 
@@ -310,7 +310,7 @@ async def list_orders(user: User = Depends(get_current_user), db: AsyncSession =
 
 
 @router.put("/orders/{order_id}/fulfill")
-async def fulfill_order(order_id: int, db: AsyncSession = Depends(get_db)):
+async def fulfill_order(order_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await db.execute(
         update(StripeOrder).where(StripeOrder.id == order_id).values(
             fulfillment_status="fulfilled", fulfilled_at=datetime.now(timezone.utc)

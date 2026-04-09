@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -8,7 +8,7 @@ class CustomDomain(Base):
     __tablename__ = "custom_domains"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     domain = Column(Text, nullable=False, unique=True)
     target_type = Column(String(16), nullable=False)  # 'site' | 'space' | 'service'
     target_id = Column(Integer)

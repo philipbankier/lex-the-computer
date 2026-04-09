@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
@@ -26,7 +26,7 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     display_name = Column(String(255))
     bio = Column(Text)
     interests = Column(JSONB)

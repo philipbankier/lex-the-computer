@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
@@ -9,7 +9,7 @@ class Service(Base):
     __tablename__ = "services"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     type = Column(String(8), nullable=False)  # 'http' | 'tcp'
     port = Column(Integer)

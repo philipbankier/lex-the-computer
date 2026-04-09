@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -8,7 +8,7 @@ class Integration(Base):
     __tablename__ = "integrations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     provider = Column(String(64), nullable=False)
     label = Column(String(255))
     access_token = Column(Text)

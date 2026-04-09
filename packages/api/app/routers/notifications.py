@@ -36,7 +36,7 @@ async def unread_count(user: User = Depends(get_current_user), db: AsyncSession 
 
 
 @router.post("/{notification_id}/read")
-async def mark_read(notification_id: int, db: AsyncSession = Depends(get_db)):
+async def mark_read(notification_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await db.execute(
         update(Notification).where(Notification.id == notification_id).values(read=True)
     )

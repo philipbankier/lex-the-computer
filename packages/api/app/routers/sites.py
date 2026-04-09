@@ -66,7 +66,7 @@ async def list_sites(user: User = Depends(get_current_user), db: AsyncSession = 
 
 
 @router.get("/{site_id}")
-async def get_site(site_id: int, db: AsyncSession = Depends(get_db)):
+async def get_site(site_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if not site:
@@ -75,7 +75,7 @@ async def get_site(site_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{site_id}")
-async def update_site(site_id: int, body: SiteUpdate, db: AsyncSession = Depends(get_db)):
+async def update_site(site_id: int, body: SiteUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if not site:
@@ -90,7 +90,7 @@ async def update_site(site_id: int, body: SiteUpdate, db: AsyncSession = Depends
 
 
 @router.delete("/{site_id}")
-async def delete_site(site_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_site(site_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if site:
@@ -103,7 +103,7 @@ async def delete_site(site_id: int, db: AsyncSession = Depends(get_db)):
 
 # Lifecycle stubs — will be wired to site_runner.py
 @router.post("/{site_id}/publish")
-async def publish_site(site_id: int, db: AsyncSession = Depends(get_db)):
+async def publish_site(site_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if site:
@@ -113,7 +113,7 @@ async def publish_site(site_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{site_id}/unpublish")
-async def unpublish_site(site_id: int, db: AsyncSession = Depends(get_db)):
+async def unpublish_site(site_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if site:
@@ -123,12 +123,12 @@ async def unpublish_site(site_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{site_id}/restart")
-async def restart_site(site_id: int):
+async def restart_site(site_id: int, user: User = Depends(get_current_user)):
     return {"ok": True, "status": "restarted"}
 
 
 @router.get("/{site_id}/files")
-async def list_site_files(site_id: int, db: AsyncSession = Depends(get_db)):
+async def list_site_files(site_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if not site:
@@ -142,7 +142,7 @@ async def list_site_files(site_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{site_id}/files/content")
-async def read_site_file(site_id: int, path: str = Query(""), db: AsyncSession = Depends(get_db)):
+async def read_site_file(site_id: int, path: str = Query(""), user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if not site:
@@ -152,14 +152,15 @@ async def read_site_file(site_id: int, path: str = Query(""), db: AsyncSession =
     if not str(abs_path).startswith(str(base.resolve())):
         return {"error": "invalid path"}, 400
     try:
-        content = abs_path.read_text()
+        async with aiofiles.open(abs_path, "r") as f:
+            content = await f.read()
     except Exception:
         return {"error": "read failed"}, 404
     return {"path": path, "content": content}
 
 
 @router.post("/{site_id}/files/content")
-async def write_site_file(site_id: int, body: SiteFileWrite, db: AsyncSession = Depends(get_db)):
+async def write_site_file(site_id: int, body: SiteFileWrite, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Site).where(Site.id == site_id).limit(1))
     site = result.scalar_one_or_none()
     if not site:
