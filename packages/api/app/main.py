@@ -12,15 +12,19 @@ from app.routers import (
     domains,
     files,
     health,
+    integrations,
     notifications,
     onboarding,
     profile,
     public_api,
     search,
     secrets,
+    sell,
     services,
     settings,
     sites,
+    skills,
+    space,
     system,
     terminal,
 )
@@ -64,3 +68,7 @@ app.include_router(domains.router)
 app.include_router(api_keys.router)
 app.include_router(admin.router)
 app.include_router(public_api.router)
+app.include_router(sell.router)
+app.include_router(space.router)
+app.include_router(integrations.router)
+app.include_router(skills.router)
