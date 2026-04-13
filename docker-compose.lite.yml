@@ -1,10 +1,15 @@
-# Lite mode: excludes Honcho services for Core memory users.
-# Usage: docker compose -f docker-compose.v2.yml -f docker-compose.lite.yml up
+# Lite mode: excludes Honcho services, Hermes uses built-in Core memory.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.lite.yml up
 
 services:
   honcho-api:
     deploy:
       replicas: 0
+
   honcho-deriver:
     deploy:
       replicas: 0
+
+  api:
+    environment:
+      - HONCHO_BASE_URL=
