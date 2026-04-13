@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type Site = { id: number; name: string; slug: string; is_published: boolean; port?: number | null };
 type Service = { id: number; name: string; type: string; port?: number | null; is_running?: boolean };

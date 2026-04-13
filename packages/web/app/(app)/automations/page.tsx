@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { parseCronToHuman } from '@/lib/cron';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type Automation = { id: number; name: string; instruction: string; schedule: string; is_active: boolean; delivery?: string; last_run?: string | null; model?: string };
 

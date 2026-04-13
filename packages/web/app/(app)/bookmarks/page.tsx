@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useTabs } from '@/components/tabs/context';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type Bookmark = { id: number; type: string; target_id: string | null; name: string; href: string | null; created_at: string };
 

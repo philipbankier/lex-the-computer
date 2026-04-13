@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from 'react';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type SpaceRoute = { id: number; path: string; type: 'page' | 'api'; code: string; is_public: boolean; created_at: string; updated_at: string };
 type RouteVersion = { id: number; route_id: number; code: string; version: number; created_at: string };

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { themes, applyTheme, getTheme } from '@/lib/themes';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 const Section = ({ title, children }: any) => (
   <div className="border border-white/10 rounded p-3 space-y-2">

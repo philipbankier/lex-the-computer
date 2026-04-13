@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type Conversation = { id: number; title: string | null; model: string | null; persona_id: number | null; created_at: string };
 type Message = { id: number; role: 'user' | 'assistant' | 'system' | 'tool'; content: string; name?: string | null; created_at: string };
