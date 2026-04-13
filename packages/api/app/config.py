@@ -6,6 +6,14 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/lex"
     redis_url: str = "redis://redis:6379"
 
+    # Agent Harness
+    agent_harness: str = "hermes"  # "hermes" or "openclaw"
+
+    # Hermes
+    hermes_api_url: str = "http://hermes:8642"
+    hermes_api_key: str = "lex-local-dev"
+    hermes_data_dir: str = "/data/hermes"
+
     # OpenClaw
     openclaw_gateway_url: str = "ws://openclaw:18789"
     openclaw_gateway_token: str = ""

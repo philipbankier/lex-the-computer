@@ -1,7 +1,7 @@
 """Harness abstraction layer for Lex the Computer.
 
-Exports the AgentHarness ABC and all shared dataclasses.
-Concrete implementations live in their own modules (e.g. openclaw.py).
+Exports the AgentHarness ABC, shared dataclasses, and the factory function.
+Concrete implementations live in their own modules (openclaw.py, hermes.py).
 """
 
 from .base import (
@@ -12,6 +12,7 @@ from .base import (
     Skill,
     StreamChunk,
 )
+from .factory import get_harness
 
 __all__ = [
     "AgentHarness",
@@ -20,4 +21,5 @@ __all__ = [
     "Session",
     "Skill",
     "StreamChunk",
+    "get_harness",
 ]
