@@ -1,19 +1,21 @@
+import asyncio
 import os
 import platform
-import subprocess
 import sys
 
 import psutil
 from fastapi import APIRouter
 
 from app.config import settings
+from app.services import system_manager
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
 
 @router.get("/stats")
 async def system_stats():
-    cpu_percent = psutil.cpu_percent(interval=0.1)
+    stats = system_manager.get_stats()
+    cpu_percent = stats["cpu_percent"]
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     load_avg = os.getloadavg()
@@ -46,15 +48,14 @@ async def system_stats():
 
 @router.post("/reboot")
 async def reboot():
-    # Graceful restart — exit process; systemd/Docker will restart
-    import asyncio
+    result = system_manager.reboot()
 
     async def _exit():
         await asyncio.sleep(0.5)
         sys.exit(0)
 
     asyncio.create_task(_exit())
-    return {"ok": True, "message": "Restarting..."}
+    return result
 
 
 @router.post("/clear-cache")
@@ -65,19 +66,15 @@ async def clear_cache():
         r = aioredis.from_url(settings.redis_url)
         await r.flushdb()
         await r.aclose()
-        return {"ok": True, "message": "Cache cleared"}
+        cleared = system_manager.clear_cache()
+        return {"ok": True, "message": "Cache cleared", "cleared": cleared}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 
 @router.get("/logs")
 async def get_logs():
-    try:
-        log_path = "/tmp/lex-api.log"
-        if os.path.exists(log_path):
-            with open(log_path) as f:
-                lines = f.readlines()[-100:]
-            return {"lines": [l.rstrip() for l in lines]}
-    except Exception:
-        pass
-    return {"lines": ["Log collection not configured. Check container logs."]}
+    lines = system_manager.get_logs()
+    if not lines:
+        lines = ["Log collection not configured. Check container logs."]
+    return {"lines": lines}

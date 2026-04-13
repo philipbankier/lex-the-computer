@@ -1,100 +1,89 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
-from app.models.service import Service
+from app.schemas.services import ServiceCreate, ServiceUpdate
+from app.services import service_manager
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
 
-class ServiceCreate(BaseModel):
-    name: str
-    type: str  # 'http' | 'tcp'
-    port: int | None = None
-    entrypoint: str | None = None
-    working_dir: str | None = None
-    env_vars: dict | None = None
-
-
-class ServiceUpdate(BaseModel):
-    name: str | None = None
-    type: str | None = None
-    port: int | None = None
-    entrypoint: str | None = None
-    working_dir: str | None = None
-    env_vars: dict | None = None
-
-
 @router.post("/")
 async def create_service(body: ServiceCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    svc = Service(
-        user_id=user.id, name=body.name, type=body.type, port=body.port,
-        entrypoint=body.entrypoint, working_dir=body.working_dir,
-        env_vars=body.env_vars, is_running=False,
+    return await service_manager.create_service(
+        db, user.id, name=body.name, type=body.type,
+        entrypoint=body.entrypoint, port=body.port, env_vars=body.env_vars,
     )
-    db.add(svc)
-    await db.commit()
-    await db.refresh(svc)
-    return svc
 
 
 @router.get("/")
 async def list_services(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Service).where(Service.user_id == user.id))
-    return result.scalars().all()
+    return await service_manager.list_services(db, user.id)
 
 
 @router.get("/{service_id}")
 async def get_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Service).where(Service.id == service_id).limit(1))
-    svc = result.scalar_one_or_none()
+    svc = await service_manager.get_service(db, user.id, service_id)
     if not svc:
-        return {"error": "not found"}, 404
+        raise HTTPException(status_code=404, detail="Service not found")
     return svc
 
 
 @router.patch("/{service_id}")
 async def update_service(service_id: int, body: ServiceUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Service).where(Service.id == service_id).limit(1))
-    svc = result.scalar_one_or_none()
+    svc = await service_manager.update_service(
+        db, user.id, service_id,
+        name=body.name, entrypoint=body.entrypoint, port=body.port, env_vars=body.env_vars,
+    )
     if not svc:
-        return {"error": "not found"}, 404
-    for field in ["name", "type", "port", "entrypoint", "working_dir", "env_vars"]:
-        val = getattr(body, field, None)
-        if val is not None:
-            setattr(svc, field, val)
-    await db.commit()
-    await db.refresh(svc)
+        raise HTTPException(status_code=404, detail="Service not found")
     return svc
 
 
 @router.delete("/{service_id}")
 async def delete_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await db.execute(delete(Service).where(Service.id == service_id))
-    await db.commit()
+    deleted = await service_manager.delete_service(db, user.id, service_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Service not found")
     return {"ok": True}
 
 
-# Lifecycle stubs — will be implemented in service_runner.py
 @router.post("/{service_id}/start")
-async def start_service(service_id: int, user: User = Depends(get_current_user)):
-    return {"ok": True, "status": "started"}
+async def start_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    svc = await service_manager.get_service(db, user.id, service_id)
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+    try:
+        svc = await service_manager.start_service(db, svc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "status": "started", "port": svc.port}
 
 
 @router.post("/{service_id}/stop")
-async def stop_service(service_id: int, user: User = Depends(get_current_user)):
+async def stop_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    svc = await service_manager.get_service(db, user.id, service_id)
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+    await service_manager.stop_service(db, svc)
     return {"ok": True, "status": "stopped"}
 
 
 @router.post("/{service_id}/restart")
-async def restart_service(service_id: int, user: User = Depends(get_current_user)):
-    return {"ok": True, "status": "restarted"}
+async def restart_service(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    svc = await service_manager.get_service(db, user.id, service_id)
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+    svc = await service_manager.restart_service(db, svc)
+    return {"ok": True, "status": "restarted", "port": svc.port}
 
 
 @router.get("/{service_id}/logs")
-async def get_service_logs(service_id: int, user: User = Depends(get_current_user)):
-    return {"lines": []}
+async def get_service_logs(service_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    svc = await service_manager.get_service(db, user.id, service_id)
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+    lines = service_manager.get_logs(service_id)
+    return {"lines": lines}

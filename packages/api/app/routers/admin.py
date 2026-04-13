@@ -3,16 +3,13 @@ import platform
 import psutil
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
-from app.models.commerce import StripeOrder
-from app.models.container import UserContainer
-from app.models.usage import UsageRecord
+from app.services import admin_manager
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -30,8 +27,7 @@ class UserRoleUpdate(BaseModel):
 
 @router.get("/stats")
 async def admin_stats(user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    user_count = (await db.execute(select(func.count()).select_from(User))).scalar() or 0
-
+    stats = await admin_manager.get_stats(db)
     return {
         "system": {
             "cpus": psutil.cpu_count(),
@@ -42,17 +38,14 @@ async def admin_stats(user: User = Depends(require_admin), db: AsyncSession = De
             "arch": platform.machine(),
             "hostname": platform.node(),
         },
-        "counts": {"users": user_count},
+        "counts": {"users": stats["total_users"]},
         "multiUser": settings.multi_user,
     }
 
 
 @router.get("/users")
 async def list_users(user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(User).order_by(User.created_at.desc())
-    )
-    users = result.scalars().all()
+    users = await admin_manager.list_users(db)
     return [
         {
             "id": u.id, "email": u.email, "handle": u.handle, "name": u.name,
@@ -64,30 +57,19 @@ async def list_users(user: User = Depends(require_admin), db: AsyncSession = Dep
 
 @router.get("/users/{user_id}")
 async def get_user_detail(user_id: int, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.id == user_id).limit(1))
-    target = result.scalar_one_or_none()
+    target = await admin_manager.get_user(db, user_id)
     if not target:
-        return {"error": "Not found"}, 404
-
-    container = None
-    if settings.multi_user:
-        c_result = await db.execute(select(UserContainer).where(UserContainer.user_id == user_id).limit(1))
-        container = c_result.scalar_one_or_none()
-
+        raise HTTPException(status_code=404, detail="User not found")
+    containers = await admin_manager.list_containers(db) if settings.multi_user else []
+    container = next((c for c in containers if c.user_id == user_id), None)
     return {"user": target, "container": container}
 
 
 @router.patch("/users/{user_id}")
 async def update_user(user_id: int, body: UserRoleUpdate, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.id == user_id).limit(1))
-    target = result.scalar_one_or_none()
+    target = await admin_manager.update_user(db, user_id, role=body.role, is_disabled=body.is_disabled)
     if not target:
-        return {"error": "Not found"}, 404
-    if body.role is not None:
-        target.role = body.role
-    if body.is_disabled is not None:
-        target.is_disabled = body.is_disabled
-    await db.commit()
+        raise HTTPException(status_code=404, detail="User not found")
     return {"ok": True}
 
 
@@ -95,37 +77,30 @@ async def update_user(user_id: int, body: UserRoleUpdate, user: User = Depends(r
 async def list_containers(user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     if not settings.multi_user:
         return []
-    result = await db.execute(select(UserContainer))
-    return result.scalars().all()
+    return await admin_manager.list_containers(db)
 
 
-@router.post("/containers/{user_id}/start")
-async def start_container(user_id: int, user: User = Depends(require_admin)):
-    # Stub — will be wired to container_manager.py
-    return {"ok": True}
+@router.post("/containers/{container_id}/start")
+async def start_container(container_id: int, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    container = await admin_manager.start_container(db, container_id)
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    return {"ok": True, "status": container.status}
 
 
-@router.post("/containers/{user_id}/stop")
-async def stop_container(user_id: int, user: User = Depends(require_admin)):
-    # Stub — will be wired to container_manager.py
-    return {"ok": True}
+@router.post("/containers/{container_id}/stop")
+async def stop_container(container_id: int, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    container = await admin_manager.stop_container(db, container_id)
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    return {"ok": True, "status": container.status}
 
 
 @router.get("/usage")
 async def get_usage(user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(UsageRecord).order_by(UsageRecord.created_at.desc()).limit(100))
-    return result.scalars().all()
+    return await admin_manager.get_usage(db)
 
 
 @router.get("/billing")
 async def get_billing(user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(
-            func.coalesce(func.sum(StripeOrder.amount), 0).label("total"),
-            func.count().label("count"),
-        )
-        .select_from(StripeOrder)
-        .where(StripeOrder.payment_status == "paid")
-    )
-    row = result.one()
-    return {"totalRevenue": int(row.total), "totalOrders": row.count}
+    return await admin_manager.get_billing_summary(db)

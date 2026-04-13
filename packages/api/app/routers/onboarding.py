@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -10,7 +9,9 @@ from app.config import settings
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User, UserProfile
+from app.services import onboarding_manager
 from app.services.openclaw_setup import OpenClawSetup
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
@@ -23,7 +24,7 @@ class ProfileStep(BaseModel):
 
 
 class MemoryStep(BaseModel):
-    provider: str  # "honcho" or "core"
+    provider: str
 
 
 class ProviderStep(BaseModel):
@@ -42,8 +43,8 @@ class ChannelStep(BaseModel):
 
 
 @router.get("/status")
-async def onboarding_status(user: User = Depends(get_current_user)):
-    return {"completed": user.onboarding_completed}
+async def onboarding_status(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await onboarding_manager.get_status(db, user)
 
 
 @router.post("/profile")
@@ -75,22 +76,17 @@ async def save_profile(body: ProfileStep, user: User = Depends(get_current_user)
 
 @router.post("/memory")
 async def set_memory_provider(body: MemoryStep, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    user.memory_provider = body.provider
-    await db.commit()
+    await onboarding_manager.save_memory(db, user, body.provider)
     return {"ok": True}
 
 
 @router.get("/providers/detect")
 async def detect_providers(user: User = Depends(get_current_user)):
-    """Return list of detected AI CLI providers."""
-    setup = OpenClawSetup(settings.workspace_dir)
-    providers = await asyncio.to_thread(setup.detect_cli_providers)
-    return providers
+    return onboarding_manager.detect_providers()
 
 
 @router.post("/provider")
 async def set_ai_provider(body: ProviderStep, user: User = Depends(get_current_user)):
-    """Detect available CLIs and write provider config to openclaw.json."""
     setup = OpenClawSetup(settings.workspace_dir)
 
     def _write() -> None:
@@ -103,7 +99,6 @@ async def set_ai_provider(body: ProviderStep, user: User = Depends(get_current_u
 
 @router.post("/persona")
 async def set_persona(body: PersonaStep, user: User = Depends(get_current_user)):
-    """Write persona to SOUL.md in the OpenClaw workspace."""
     setup = OpenClawSetup(settings.workspace_dir)
     await asyncio.to_thread(setup.write_persona, body.name, body.prompt)
     return {"ok": True, "name": body.name}
@@ -111,7 +106,6 @@ async def set_persona(body: PersonaStep, user: User = Depends(get_current_user))
 
 @router.post("/channels")
 async def set_channels(body: ChannelStep, user: User = Depends(get_current_user)):
-    """Write Telegram/Discord config into openclaw.json."""
     setup = OpenClawSetup(settings.workspace_dir)
 
     def _write() -> None:
@@ -132,6 +126,5 @@ async def set_channels(body: ChannelStep, user: User = Depends(get_current_user)
 
 @router.post("/complete")
 async def complete_onboarding(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    user.onboarding_completed = True
-    await db.commit()
-    return {"ok": True}
+    result = await onboarding_manager.complete_onboarding(db, user)
+    return result

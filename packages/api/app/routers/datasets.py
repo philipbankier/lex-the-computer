@@ -1,16 +1,17 @@
 from pathlib import Path
 
 import duckdb
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.models.user import User
 from app.models.dataset import Dataset
+from app.models.user import User
+from app.services import dataset_manager
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 
@@ -28,18 +29,14 @@ class QueryRequest(BaseModel):
 
 @router.get("/")
 async def list_datasets(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Dataset).where(Dataset.user_id == user.id).order_by(Dataset.created_at.desc())
-    )
-    return result.scalars().all()
+    return await dataset_manager.list_datasets(db, user.id)
 
 
 @router.get("/{dataset_id}")
 async def get_dataset(dataset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
-    ds = result.scalar_one_or_none()
+    ds = await dataset_manager.get_dataset(db, user.id, dataset_id)
     if not ds:
-        return {"error": "Not found"}, 404
+        raise HTTPException(status_code=404, detail="Dataset not found")
     return ds
 
 
@@ -84,23 +81,17 @@ async def create_dataset(body: DatasetCreate, user: User = Depends(get_current_u
 
 @router.delete("/{dataset_id}")
 async def delete_dataset(dataset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
-    ds = result.scalar_one_or_none()
-    if not ds:
-        return {"error": "Not found"}, 404
-    if ds.file_path:
-        Path(ds.file_path).unlink(missing_ok=True)
-    await db.execute(delete(Dataset).where(Dataset.id == dataset_id))
-    await db.commit()
+    deleted = await dataset_manager.delete_dataset(db, user.id, dataset_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Dataset not found")
     return {"ok": True}
 
 
 @router.post("/{dataset_id}/query")
 async def run_query(dataset_id: int, body: QueryRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
-    ds = result.scalar_one_or_none()
+    ds = await dataset_manager.get_dataset(db, user.id, dataset_id)
     if not ds:
-        return {"error": "Not found"}, 404
+        raise HTTPException(status_code=404, detail="Dataset not found")
     try:
         con = duckdb.connect(str(ds.file_path), read_only=True)
         rows = con.execute(body.sql).fetchdf().to_dict(orient="records")
@@ -108,15 +99,14 @@ async def run_query(dataset_id: int, body: QueryRequest, user: User = Depends(ge
         con.close()
         return {"rows": rows, "columns": columns}
     except Exception as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{dataset_id}/preview")
 async def preview_dataset(dataset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id).limit(1))
-    ds = result.scalar_one_or_none()
+    ds = await dataset_manager.get_dataset(db, user.id, dataset_id)
     if not ds:
-        return {"error": "Not found"}, 404
+        raise HTTPException(status_code=404, detail="Dataset not found")
     try:
         con = duckdb.connect(str(ds.file_path), read_only=True)
         rows = con.execute("SELECT * FROM data LIMIT 100").fetchdf().to_dict(orient="records")
@@ -124,4 +114,4 @@ async def preview_dataset(dataset_id: int, user: User = Depends(get_current_user
         con.close()
         return {"rows": rows, "columns": columns}
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(status_code=500, detail=str(e))

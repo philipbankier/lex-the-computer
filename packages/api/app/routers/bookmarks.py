@@ -1,40 +1,30 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
-from app.models.bookmark import Bookmark
+from app.schemas.content import BookmarkCreate
+from app.services import bookmarks as bookmark_svc
 
 router = APIRouter(prefix="/api/bookmarks", tags=["bookmarks"])
 
 
-class BookmarkCreate(BaseModel):
-    type: str = "tab"
-    target_id: int | None = None
-    name: str | None = None
-    href: str | None = None
-
-
 @router.get("/")
 async def list_bookmarks(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Bookmark).where(Bookmark.user_id == user.id))
-    return result.scalars().all()
+    return await bookmark_svc.list_bookmarks(db, user.id)
 
 
 @router.post("/")
 async def create_bookmark(body: BookmarkCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    bm = Bookmark(user_id=user.id, type=body.type, target_id=body.target_id, name=body.name, href=body.href)
-    db.add(bm)
-    await db.commit()
-    await db.refresh(bm)
-    return bm
+    return await bookmark_svc.create_bookmark(
+        db, user.id, type=body.type, name=body.name, target_id=body.target_id, href=body.href
+    )
 
 
 @router.delete("/{bookmark_id}")
 async def delete_bookmark(bookmark_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await db.execute(delete(Bookmark).where(Bookmark.id == bookmark_id))
-    await db.commit()
+    deleted = await bookmark_svc.delete_bookmark(db, user.id, bookmark_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Bookmark not found")
     return {"ok": True}

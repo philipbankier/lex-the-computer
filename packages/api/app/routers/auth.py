@@ -1,32 +1,20 @@
-from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.user import User
+from app.schemas.auth import AuthRequest
+from app.services import auth as auth_svc
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-class AuthRequest(BaseModel):
-    email: str
 
 
 @router.post("/signup")
 async def signup(body: AuthRequest, response: Response, db: AsyncSession = Depends(get_db)):
     if settings.allowed_emails and body.email not in settings.allowed_emails:
-        return {"error": "Email not allowed"}, 403
+        raise HTTPException(status_code=403, detail="Email not allowed")
 
-    result = await db.execute(select(User).where(User.email == body.email))
-    user = result.scalar_one_or_none()
-    if user is None:
-        user = User(email=body.email)
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-
+    user, _created = await auth_svc.get_or_create_user(db, body.email)
     response.set_cookie(
         key=settings.session_cookie_name,
         value=body.email,
@@ -39,10 +27,9 @@ async def signup(body: AuthRequest, response: Response, db: AsyncSession = Depen
 
 @router.post("/login")
 async def login(body: AuthRequest, response: Response, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == body.email))
-    user = result.scalar_one_or_none()
+    user = await auth_svc.get_user_by_email(db, body.email)
     if user is None:
-        return {"error": "User not found"}, 404
+        raise HTTPException(status_code=404, detail="User not found")
 
     response.set_cookie(
         key=settings.session_cookie_name,
@@ -60,8 +47,7 @@ async def session_check(request: Request, db: AsyncSession = Depends(get_db)):
     if not email:
         return {"authenticated": False}
 
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+    user = await auth_svc.get_user_by_email(db, email)
     if user is None:
         return {"authenticated": False}
 

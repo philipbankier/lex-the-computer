@@ -1,21 +1,15 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.models.user import User
 from app.models.secret import Secret
+from app.models.user import User
+from app.schemas.integrations import ProviderConfig
+from app.services import settings_manager
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-PROVIDERS = ["openai", "anthropic", "google", "mistral", "groq", "openrouter"]
-
-
-class ProviderConfig(BaseModel):
-    provider: str
-    api_key: str
 
 
 @router.get("/providers")
@@ -23,7 +17,11 @@ async def list_providers(user: User = Depends(get_current_user), db: AsyncSessio
     result = await db.execute(select(Secret).where(Secret.user_id == user.id))
     rows = result.scalars().all()
     keys = {r.key for r in rows}
-    return [{"provider": p, "configured": f"provider:{p}" in keys} for p in PROVIDERS]
+
+    providers = settings_manager.list_providers()
+    for p in providers:
+        p["configured"] = f"provider:{p['id']}" in keys or p["configured"]
+    return providers
 
 
 @router.post("/providers")
@@ -38,6 +36,8 @@ async def set_provider(body: ProviderConfig, user: User = Depends(get_current_us
     else:
         db.add(Secret(user_id=user.id, key=key, value_encrypted=body.api_key))
     await db.commit()
+
+    settings_manager.set_provider(body.provider, body.api_key, body.base_url, body.model)
     return {"ok": True}
 
 
@@ -46,4 +46,5 @@ async def delete_provider(provider: str, user: User = Depends(get_current_user),
     key = f"provider:{provider}"
     await db.execute(delete(Secret).where(Secret.user_id == user.id, Secret.key == key))
     await db.commit()
+    settings_manager.delete_provider(provider)
     return {"ok": True}

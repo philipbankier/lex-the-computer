@@ -5,24 +5,22 @@ from html import escape as escape_html
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, Depends, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.middleware.auth import get_current_user
+from app.models.space import SpaceError, SpaceRoute, SpaceRouteVersion
 from app.models.user import User
-from app.models.space import SpaceRoute, SpaceRouteVersion, SpaceAsset, SpaceSettings, SpaceError
+from app.services import space_manager
 
 router = APIRouter(prefix="/api/space", tags=["space"])
 
 ASSETS_BASE = Path(settings.workspace_dir) / "space-assets"
-
-
-# ── Routes CRUD ──────────────────────────────────────────────────────
 
 
 class RouteCreate(BaseModel):
@@ -38,47 +36,51 @@ class RouteUpdate(BaseModel):
     isPublic: bool | None = None
 
 
+class AssetBase64(BaseModel):
+    filename: str
+    content: str
+
+
+class SpaceSettingsUpdate(BaseModel):
+    handle: str | None = None
+    title: str | None = None
+    description: str | None = None
+    favicon: str | None = None
+    custom_css: str | None = None
+
+
 @router.get("/routes")
 async def list_routes(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceRoute).where(SpaceRoute.user_id == user.id))
-    return result.scalars().all()
+    return await space_manager.list_routes(db, user.id)
 
 
 @router.post("/routes")
 async def create_route(body: RouteCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     route_path = body.path.strip()
     if not route_path:
-        return {"error": "path required"}, 400
+        raise HTTPException(status_code=400, detail="path required")
     route_type = "api" if body.type == "api" else "page"
     code = body.code or _default_code(route_type, route_path)
     is_public = True if route_type == "api" else body.isPublic
 
-    route = SpaceRoute(user_id=user.id, path=route_path, type=route_type, code=code, is_public=is_public)
-    db.add(route)
-    await db.commit()
-    await db.refresh(route)
-
-    # Save initial version
-    db.add(SpaceRouteVersion(route_id=route.id, code=code, version=1))
-    await db.commit()
-    return route
+    return await space_manager.create_route(
+        db, user.id, path=route_path, type=route_type, code=code, is_public=is_public,
+    )
 
 
 @router.get("/routes/{route_id}")
 async def get_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
-    route = result.scalar_one_or_none()
+    route = await space_manager.get_route(db, user.id, route_id)
     if not route:
-        return {"error": "not found"}, 404
+        raise HTTPException(status_code=404, detail="Route not found")
     return route
 
 
 @router.put("/routes/{route_id}")
 async def update_route(route_id: int, body: RouteUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
-    route = result.scalar_one_or_none()
+    route = await space_manager.get_route(db, user.id, route_id)
     if not route:
-        return {"error": "not found"}, 404
+        raise HTTPException(status_code=404, detail="Route not found")
 
     old_code = route.code
     if body.code is not None:
@@ -90,9 +92,10 @@ async def update_route(route_id: int, body: RouteUpdate, user: User = Depends(ge
     route.updated_at = datetime.now(timezone.utc)
     await db.commit()
 
-    # Auto-create version if code changed
     if body.code is not None and body.code != old_code:
-        versions = (await db.execute(select(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id))).scalars().all()
+        versions = (await db.execute(
+            select(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id)
+        )).scalars().all()
         max_ver = max((v.version for v in versions), default=0)
         db.add(SpaceRouteVersion(route_id=route_id, code=body.code, version=max_ver + 1))
         await db.commit()
@@ -110,73 +113,30 @@ async def delete_route(route_id: int, user: User = Depends(get_current_user), db
     return {"ok": True}
 
 
-# ── Version History / Undo / Redo ────────────────────────────────────
-
-
 @router.get("/routes/{route_id}/history")
 async def route_history(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id).order_by(SpaceRouteVersion.version)
-    )
-    return result.scalars().all()
+    return await space_manager.list_versions(db, route_id)
 
 
 @router.post("/routes/{route_id}/undo")
 async def undo_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
-    route = result.scalar_one_or_none()
+    route = await space_manager.undo_route(db, user.id, route_id)
     if not route:
-        return {"error": "not found"}, 404
-
-    versions = (await db.execute(
-        select(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id).order_by(SpaceRouteVersion.version)
-    )).scalars().all()
-
-    current_idx = next((i for i, v in enumerate(versions) if v.code == route.code), -1)
-    if current_idx <= 0:
-        return {"error": "nothing to undo"}, 400
-
-    route.code = versions[current_idx - 1].code
-    route.updated_at = datetime.now(timezone.utc)
-    await db.commit()
-    await db.refresh(route)
+        raise HTTPException(status_code=404, detail="Route not found")
     return route
 
 
 @router.post("/routes/{route_id}/redo")
 async def redo_route(route_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceRoute).where(SpaceRoute.id == route_id).limit(1))
-    route = result.scalar_one_or_none()
+    route = await space_manager.redo_route(db, user.id, route_id)
     if not route:
-        return {"error": "not found"}, 404
-
-    versions = (await db.execute(
-        select(SpaceRouteVersion).where(SpaceRouteVersion.route_id == route_id).order_by(SpaceRouteVersion.version)
-    )).scalars().all()
-
-    current_idx = next((i for i, v in enumerate(versions) if v.code == route.code), -1)
-    if current_idx < 0 or current_idx >= len(versions) - 1:
-        return {"error": "nothing to redo"}, 400
-
-    route.code = versions[current_idx + 1].code
-    route.updated_at = datetime.now(timezone.utc)
-    await db.commit()
-    await db.refresh(route)
+        raise HTTPException(status_code=404, detail="Route not found")
     return route
-
-
-# ── Assets ───────────────────────────────────────────────────────────
-
-
-class AssetBase64(BaseModel):
-    filename: str
-    content: str  # base64
 
 
 @router.get("/assets")
 async def list_assets(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceAsset).where(SpaceAsset.user_id == user.id))
-    return result.scalars().all()
+    return await space_manager.list_assets(db, user.id)
 
 
 @router.post("/assets")
@@ -192,111 +152,66 @@ async def upload_asset(
         form = await request.form()
         file = form.get("file")
         if not file or not hasattr(file, "read"):
-            return {"error": "file required"}, 400
-        filename = file.filename or "upload"
+            raise HTTPException(status_code=400, detail="file required")
         data = await file.read()
-        file_path = ASSETS_BASE / filename
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(data)
-        mime = file.content_type or mimetypes.guess_type(filename)[0]
-        asset = SpaceAsset(user_id=user.id, filename=filename, path=str(file_path), mime_type=mime, size=len(data))
-        db.add(asset)
-        await db.commit()
-        await db.refresh(asset)
-        return asset
+        return await space_manager.upload_asset(db, user.id, file.filename or "upload", data)
 
-    # JSON upload (base64)
     body = await request.json()
     filename = (body.get("filename") or "").strip()
     b64_content = body.get("content", "")
     if not filename or not b64_content:
-        return {"error": "filename and content required"}, 400
+        raise HTTPException(status_code=400, detail="filename and content required")
     data = b64decode(b64_content)
-    file_path = ASSETS_BASE / filename
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(data)
-    mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    asset = SpaceAsset(user_id=user.id, filename=filename, path=str(file_path), mime_type=mime, size=len(data))
-    db.add(asset)
-    await db.commit()
-    await db.refresh(asset)
-    return asset
+    return await space_manager.upload_asset(db, user.id, filename, data)
 
 
 @router.delete("/assets/{asset_id}")
 async def delete_asset(asset_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceAsset).where(SpaceAsset.id == asset_id).limit(1))
-    asset = result.scalar_one_or_none()
-    if asset:
-        Path(asset.path).unlink(missing_ok=True)
-    await db.execute(delete(SpaceAsset).where(SpaceAsset.id == asset_id))
-    await db.commit()
+    deleted = await space_manager.delete_asset(db, user.id, asset_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Asset not found")
     return {"ok": True}
-
-
-# ── Settings ─────────────────────────────────────────────────────────
-
-
-class SpaceSettingsUpdate(BaseModel):
-    handle: str | None = None
-    title: str | None = None
-    description: str | None = None
-    favicon: str | None = None
-    custom_css: str | None = None
 
 
 @router.get("/settings")
 async def get_settings(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceSettings).where(SpaceSettings.user_id == user.id).limit(1))
-    s = result.scalar_one_or_none()
+    s = await space_manager.get_settings(db, user.id)
     return s or {"handle": "", "title": "", "description": "", "favicon": "", "custom_css": ""}
 
 
 @router.put("/settings")
 async def update_settings(body: SpaceSettingsUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceSettings).where(SpaceSettings.user_id == user.id).limit(1))
-    s = result.scalar_one_or_none()
-
-    if s:
-        for field in ["handle", "title", "description", "favicon", "custom_css"]:
-            val = getattr(body, field, None)
-            if val is not None:
-                setattr(s, field, val)
-        s.updated_at = datetime.now(timezone.utc)
-    else:
-        s = SpaceSettings(user_id=user.id, handle=body.handle or "", title=body.title, description=body.description, favicon=body.favicon, custom_css=body.custom_css)
-        db.add(s)
-    await db.commit()
-    await db.refresh(s)
-    return s
-
-
-# ── Errors ───────────────────────────────────────────────────────────
+    return await space_manager.update_settings(
+        db, user.id,
+        handle=body.handle, title=body.title, description=body.description,
+        favicon=body.favicon, custom_css=body.custom_css,
+    )
 
 
 @router.get("/errors")
 async def list_errors(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(SpaceError).order_by(SpaceError.created_at.desc()).limit(100))
-    return result.scalars().all()
+    routes = await space_manager.list_routes(db, user.id)
+    all_errors = []
+    for r in routes:
+        errors = await space_manager.list_errors(db, r.id)
+        all_errors.extend(errors)
+    return all_errors
 
 
 @router.delete("/errors")
 async def clear_errors(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    routes = (await db.execute(select(SpaceRoute).where(SpaceRoute.user_id == user.id))).scalars().all()
+    routes = await space_manager.list_routes(db, user.id)
     for r in routes:
         await db.execute(delete(SpaceError).where(SpaceError.route_id == r.id))
     await db.commit()
     return {"ok": True}
 
 
-# ── Public Space Serving ─────────────────────────────────────────────
-
-
 @router.get("/public/assets/{filename}")
 async def serve_asset(filename: str):
     file_path = ASSETS_BASE / filename
     if not file_path.exists():
-        return {"error": "not found"}, 404
+        raise HTTPException(status_code=404, detail="Asset not found")
     data = file_path.read_bytes()
     mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     return Response(content=data, media_type=mime, headers={"Cache-Control": "public, max-age=3600"})
@@ -313,28 +228,20 @@ async def serve_space_root(handle: str, db: AsyncSession = Depends(get_db)):
 
 
 async def _serve_space(handle: str, route_path: str, db: AsyncSession) -> Response:
-    result = await db.execute(select(SpaceSettings).where(SpaceSettings.handle == handle).limit(1))
-    space_settings = result.scalar_one_or_none()
-    if not space_settings:
-        return Response(content='{"error":"space not found"}', status_code=404, media_type="application/json")
-
-    routes = (await db.execute(select(SpaceRoute).where(SpaceRoute.user_id == space_settings.user_id))).scalars().all()
-    normalized = route_path if route_path else "/"
-    route = next((r for r in routes if r.path == normalized), None)
+    route = await space_manager.resolve_public_route(db, handle, route_path)
     if not route:
         return Response(content='{"error":"route not found"}', status_code=404, media_type="application/json")
-    if not route.is_public:
-        return Response(content='{"error":"not found"}', status_code=404, media_type="application/json")
 
     if route.type == "api":
         return Response(content='{"error":"API route execution not supported in V2 yet"}', status_code=501, media_type="application/json")
 
-    return _render_page(route, space_settings)
+    ss = await space_manager.get_settings(db, route.user_id)
+    return _render_page(route, ss)
 
 
 def _render_page(route, space_settings) -> HTMLResponse:
-    title = escape_html(space_settings.title or "Space")
-    custom_css = space_settings.custom_css or ""
+    title = escape_html((space_settings.title if space_settings else "") or "Space")
+    custom_css = (space_settings.custom_css if space_settings else "") or ""
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -358,9 +265,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
 </body>
 </html>"""
     return HTMLResponse(content=html)
-
-
-# ── Helpers ──────────────────────────────────────────────────────────
 
 
 def _default_code(route_type: str, route_path: str) -> str:

@@ -1,103 +1,69 @@
 import asyncio
-import socket
-from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User
-from app.models.domain import CustomDomain
+from app.schemas.domains import DomainCreate
+from app.services import domain_manager
 
 router = APIRouter(prefix="/api/domains", tags=["domains"])
-
-
-class DomainCreate(BaseModel):
-    domain: str
-    target_type: str  # 'site' | 'space' | 'service'
-    target_id: int | None = None
 
 
 @router.post("/")
 async def add_domain(body: DomainCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if body.target_type not in ("site", "space", "service"):
-        return {"error": "target_type must be site, space, or service"}, 400
-
-    token = f"lex-verify-{uuid4().hex[:12]}"
-    domain = CustomDomain(
-        user_id=user.id,
-        domain=body.domain.lower().strip(),
-        target_type=body.target_type,
-        target_id=body.target_id,
-        verified=False,
-        verification_token=token,
-        ssl_status="pending",
-    )
-    db.add(domain)
-    await db.commit()
-    await db.refresh(domain)
+        raise HTTPException(status_code=400, detail="target_type must be site, space, or service")
+    try:
+        domain = await domain_manager.create_domain(
+            db, user.id, domain=body.domain.lower().strip(),
+            target_type=body.target_type, target_id=body.target_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return {
         "domain": domain,
         "dns_instructions": {
             "cname": {"type": "CNAME", "name": body.domain, "value": "your-lex-server.example.com"},
-            "txt": {"type": "TXT", "name": f"_lex-verification.{body.domain}", "value": token},
+            "txt": {"type": "TXT", "name": f"_lex-verification.{body.domain}", "value": domain.verification_token},
         },
     }
 
 
 @router.get("/")
 async def list_domains(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(CustomDomain).where(CustomDomain.user_id == user.id))
-    return result.scalars().all()
+    return await domain_manager.list_domains(db, user.id)
 
 
 @router.post("/{domain_id}/verify")
 async def verify_domain(domain_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(CustomDomain).where(CustomDomain.id == domain_id).limit(1))
-    dom = result.scalar_one_or_none()
-    if not dom:
-        return {"error": "Not found"}, 404
-
-    try:
-        loop = asyncio.get_event_loop()
-        txt_records = await loop.run_in_executor(
-            None, lambda: socket.getaddrinfo(f"_lex-verification.{dom.domain}", None, socket.AF_INET, socket.SOCK_STREAM)
-        )
-        # DNS TXT lookup via resolver
-        import dns.resolver
-        answers = dns.resolver.resolve(f"_lex-verification.{dom.domain}", "TXT")
-        flat = [r.to_text().strip('"') for rdata in answers for r in rdata.strings]
-    except Exception:
-        flat = []
-
-    verified = dom.verification_token in flat
-    if verified:
-        dom.verified = True
-        dom.ssl_status = "active"
-        await db.commit()
-        # Try updating Caddy
-        await _update_caddy(dom.domain, dom.target_type, dom.target_id)
-        return {"verified": True, "domain": dom}
-
+    domain = await domain_manager.verify_domain(db, user.id, domain_id)
+    if domain is None:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    if domain.verified:
+        await _update_caddy(domain.domain, domain.target_type, domain.target_id)
+        return {"verified": True, "domain": domain}
     return {
         "verified": False,
-        "expected_record": {"type": "TXT", "name": f"_lex-verification.{dom.domain}", "value": dom.verification_token},
-        "found_records": flat,
+        "expected_record": {
+            "type": "TXT",
+            "name": f"_lex-verification.{domain.domain}",
+            "value": domain.verification_token,
+        },
     }
 
 
 @router.delete("/{domain_id}")
 async def delete_domain(domain_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(CustomDomain).where(CustomDomain.id == domain_id).limit(1))
-    dom = result.scalar_one_or_none()
+    dom = await domain_manager.get_domain(db, user.id, domain_id)
     if dom:
         await _remove_caddy(dom.domain)
-    await db.execute(delete(CustomDomain).where(CustomDomain.id == domain_id))
-    await db.commit()
+    deleted = await domain_manager.delete_domain(db, user.id, domain_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Domain not found")
     return {"ok": True}
 
 
