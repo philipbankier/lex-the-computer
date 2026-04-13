@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type InstalledSkill = {
   id: number;

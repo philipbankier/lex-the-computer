@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 const PERSONA_OPTIONS = [
   { name: 'Default', description: 'Balanced, helpful, concise', prompt: 'You are a helpful, balanced assistant. Be concise and clear.' },

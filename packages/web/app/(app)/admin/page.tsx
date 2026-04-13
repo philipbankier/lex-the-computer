@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 type SystemStats = {
   system: { cpus: number; totalMemory: number; freeMemory: number; uptime: number; platform: string; arch: string; hostname: string };

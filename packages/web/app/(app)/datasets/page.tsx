@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
-const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:3001';
+const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
 export default function DatasetsPage() {
   const [datasets, setDatasets] = useState<any[]>([]);
