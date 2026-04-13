@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
@@ -5,9 +6,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User, UserProfile
+from app.services.openclaw_setup import OpenClawSetup
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
@@ -77,21 +80,53 @@ async def set_memory_provider(body: MemoryStep, user: User = Depends(get_current
     return {"ok": True}
 
 
+@router.get("/providers/detect")
+async def detect_providers(user: User = Depends(get_current_user)):
+    """Return list of detected AI CLI providers."""
+    setup = OpenClawSetup(settings.workspace_dir)
+    providers = await asyncio.to_thread(setup.detect_cli_providers)
+    return providers
+
+
 @router.post("/provider")
 async def set_ai_provider(body: ProviderStep, user: User = Depends(get_current_user)):
-    # In V2, this writes to openclaw.json — stubbed for now
+    """Detect available CLIs and write provider config to openclaw.json."""
+    setup = OpenClawSetup(settings.workspace_dir)
+
+    def _write() -> None:
+        config = setup.generate_config(provider=body.provider, model=body.model)
+        setup.write_config(config)
+
+    await asyncio.to_thread(_write)
     return {"ok": True, "provider": body.provider, "model": body.model}
 
 
 @router.post("/persona")
 async def set_persona(body: PersonaStep, user: User = Depends(get_current_user)):
-    # In V2, persona is written to OpenClaw SOUL.md workspace file — stubbed for now
+    """Write persona to SOUL.md in the OpenClaw workspace."""
+    setup = OpenClawSetup(settings.workspace_dir)
+    await asyncio.to_thread(setup.write_persona, body.name, body.prompt)
     return {"ok": True, "name": body.name}
 
 
 @router.post("/channels")
 async def set_channels(body: ChannelStep, user: User = Depends(get_current_user)):
-    # In V2, writes to openclaw.json channels config — stubbed for now
+    """Write Telegram/Discord config into openclaw.json."""
+    setup = OpenClawSetup(settings.workspace_dir)
+
+    def _write() -> None:
+        config = setup.read_config()
+        config.setdefault("channels", {})
+        if body.telegram_bot_token:
+            config["channels"]["telegram"] = {
+                "enabled": True,
+                "botToken": body.telegram_bot_token,
+                "userId": body.telegram_user_id,
+                "mode": "polling",
+            }
+        setup.write_config(config)
+
+    await asyncio.to_thread(_write)
     return {"ok": True}
 
 
