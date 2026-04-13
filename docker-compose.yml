@@ -1,5 +1,7 @@
 version: "3.9"
+
 services:
+  # --- Frontend ---
   web:
     build: .
     command: pnpm --filter @lex/web dev
@@ -8,8 +10,10 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
-      - core
+      api:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "bash", "-lc", "curl -fsS http://localhost:3000/api/health || exit 1"]
       interval: 10s
@@ -19,86 +23,118 @@ services:
       - ./:/app
       - web-node-modules:/app/packages/web/node_modules
 
-  core:
-    build: .
-    command: pnpm --filter @lex/core dev
+  # --- Product API (FastAPI) ---
+  api:
+    build: ./packages/api
     ports:
-      - "3001:3001"
+      - "8000:8000"
     env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/lex
+      - REDIS_URL=redis://redis:6379
+      - OPENCLAW_GATEWAY_URL=ws://openclaw:18789
+      - HONCHO_BASE_URL=http://honcho-api:8000
+      - WORKSPACE_DIR=/data/workspace
+    volumes:
+      - workspace:/data/workspace
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-lc", "curl -fsS http://localhost:3001/health || exit 1"]
+      test: ["CMD", "bash", "-lc", "curl -fsS http://localhost:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-    volumes:
-      - ./:/app
-      - core-node-modules:/app/packages/core/node_modules
 
-  postgres:
-    image: postgres:16
+  # --- Agent Harness (OpenClaw) ---
+  openclaw:
+    image: node:24-slim
+    command: ["npx", "-y", "openclaw", "gateway"]
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN:-dev-token}
+    volumes:
+      - openclaw_data:/home/node/.openclaw
+      - workspace:/data/workspace
+
+  # --- Memory Provider (Honcho) ---
+  honcho-api:
+    build:
+      context: https://github.com/plastic-labs/honcho.git
+    command: ["python", "-m", "src.main"]
+    environment:
+      - DB_CONNECTION_URI=postgresql+psycopg://postgres:postgres@postgres:5432/honcho
+      - LLM_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AUTH_USE_AUTH=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  honcho-deriver:
+    build:
+      context: https://github.com/plastic-labs/honcho.git
+    command: ["python", "-m", "src.deriver"]
+    environment:
+      - DB_CONNECTION_URI=postgresql+psycopg://postgres:postgres@postgres:5432/honcho
+      - LLM_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    depends_on:
+      - honcho-api
+
+  # --- Infrastructure ---
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lex
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./packages/api/docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  litellm:
-    image: ghcr.io/berriai/litellm:latest
-    ports:
-      - "4000:4000"
-    volumes:
-      - ./deploy/litellm/config.yaml:/app/config.yaml
-    command: ["--config", "/app/config.yaml"]
-    healthcheck:
-      test: ["CMD", "bash", "-lc", "curl -fsS http://localhost:4000/health || exit 1"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
   caddy:
-    image: caddy:2
+    image: caddy:2-alpine
     ports:
       - "80:80"
       - "443:443"
     environment:
-      - CADDY_EMAIL=${CADDY_EMAIL}
-      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+      - CADDY_EMAIL=${CADDY_EMAIL:-}
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - web
-      - core
+      - api
 
 volumes:
-  pgdata: {}
-  redisdata: {}
-  caddy_data: {}
-  caddy_config: {}
-  web-node-modules: {}
-  core-node-modules: {}
-
+  workspace:
+  openclaw_data:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:
+  web-node-modules:
