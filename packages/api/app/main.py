@@ -7,7 +7,9 @@ from app.routers import (
     admin,
     api_keys,
     auth,
+    automations,
     bookmarks,
+    chat,
     datasets,
     domains,
     files,
@@ -51,6 +53,8 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(chat.router)
+app.include_router(automations.router)
 app.include_router(terminal.router)
 app.include_router(secrets.router)
 app.include_router(settings.router)
