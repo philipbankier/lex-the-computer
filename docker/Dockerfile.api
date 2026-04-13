@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY packages/api/pyproject.toml ./
 RUN pip install --no-cache-dir .
 
+ENV PYTHONPATH=/app
+
 COPY packages/api/alembic.ini ./
 COPY packages/api/alembic/ ./alembic/
 COPY packages/api/app/ ./app/
