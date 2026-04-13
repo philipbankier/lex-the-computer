@@ -55,8 +55,8 @@ export default function SettingsShell() {
 
 // ─── AI Settings Tab with sub-nav ──────────────────────────────────
 function AISettingsTab() {
-  const subs = ['Models', 'Personas', 'Providers', 'Personalization', 'Rules'] as const;
-  const [sub, setSub] = useState<typeof subs[number]>('Models');
+  const subs = ['Status', 'Models', 'Personas', 'Providers', 'Personalization', 'Rules'] as const;
+  const [sub, setSub] = useState<typeof subs[number]>('Status');
   return (
     <div className="flex gap-6">
       <div className="w-40 shrink-0 space-y-1">
@@ -65,6 +65,7 @@ function AISettingsTab() {
         ))}
       </div>
       <div className="flex-1 grid gap-3">
+        {sub === 'Status' && <HarnessStatusSection />}
         {sub === 'Models' && <ModelsSection />}
         {sub === 'Personas' && <PersonasSection />}
         {sub === 'Providers' && <ProvidersSection />}
@@ -72,6 +73,53 @@ function AISettingsTab() {
         {sub === 'Rules' && <RulesSection />}
       </div>
     </div>
+  );
+}
+
+function HarnessStatusSection() {
+  const [health, setHealth] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useState(() => {
+    void fetch(`${CORE_URL}/health`).then((r) => r.json()).then((j) => {
+      setHealth(j);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  });
+
+  if (loading) return <Section title="System Status"><div className="text-xs opacity-60">Loading...</div></Section>;
+  if (!health) return <Section title="System Status"><div className="text-xs opacity-60">Could not reach backend</div></Section>;
+
+  const statusColor = health.status === 'ok' ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300';
+  const dbColor = health.database === 'ok' ? 'text-green-300' : 'text-red-300';
+  const harnessStatus = health.harness?.status || 'unknown';
+  const harnessColor = harnessStatus === 'ok' ? 'text-green-300' : 'text-yellow-300';
+
+  return (
+    <Section title="System Status">
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className={`text-xs px-2 py-0.5 rounded ${statusColor}`}>{health.status}</span>
+          <span className="text-xs opacity-60">v{health.version}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-2.5 rounded bg-white/5 space-y-1">
+            <div className="text-xs opacity-60">Database</div>
+            <div className={`text-sm font-medium ${dbColor}`}>{health.database}</div>
+          </div>
+          <div className="p-2.5 rounded bg-white/5 space-y-1">
+            <div className="text-xs opacity-60">Agent Harness</div>
+            <div className={`text-sm font-medium ${harnessColor}`}>{harnessStatus}</div>
+          </div>
+        </div>
+        {health.harness && Object.entries(health.harness).filter(([k]) => k !== 'status').map(([key, val]) => (
+          <div key={key} className="flex justify-between text-xs">
+            <span className="opacity-60">{key}</span>
+            <span>{String(val)}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 

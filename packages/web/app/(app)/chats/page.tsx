@@ -7,7 +7,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
-type Conversation = { id: number; title: string | null; model: string | null; persona_id: number | null; created_at: string };
+type Conversation = { id: string; title: string | null; created_at: string; updated_at: string; message_count: number };
 type Message = { id: number; role: 'user' | 'assistant' | 'system' | 'tool'; content: string; name?: string | null; created_at: string };
 type FileEntry = { path: string; size: number };
 
@@ -16,7 +16,6 @@ export default function ChatsPage() {
   const [current, setCurrent] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [model, setModel] = useState('gpt-4o-mini');
   const [streaming, setStreaming] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionTab, setMentionTab] = useState<'files' | 'tools'>('files');
@@ -34,8 +33,7 @@ export default function ChatsPage() {
     const data = await res.json();
     setConvos(data);
     if (!current && data[0]) {
-      setCurrent(data[0]);
-      void openConvo(data[0].id);
+      selectConvo(data[0]);
     }
   }
   async function refreshFiles() {
@@ -46,111 +44,127 @@ export default function ChatsPage() {
     } catch {}
   }
   async function newConvo() {
-    const res = await fetch(`${CORE_URL}/api/chat/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) });
+    const res = await fetch(`${CORE_URL}/api/chat/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     const convo = await res.json();
     setConvos((c) => [convo, ...c]);
     setCurrent(convo);
     setMessages([]);
   }
-  async function openConvo(id: number) {
-    const res = await fetch(`${CORE_URL}/api/chat/conversations/${id}`);
-    const data = await res.json();
-    setCurrent(data.conversation);
-    setMessages(data.messages);
+  function selectConvo(convo: Conversation) {
+    setCurrent(convo);
+    setMessages([]);
   }
 
   async function send() {
-    if (!current) await newConvo();
-    const cid = current?.id || (await (await fetch(`${CORE_URL}/api/chat/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) })).json()).id;
-    if (!cid) return;
-    const userMsg: Message = { id: Date.now(), role: 'user', content: input, created_at: new Date().toISOString() } as any;
+    const conversationId = current?.id || null;
+    const userMsg: Message = { id: Date.now(), role: 'user', content: input, created_at: new Date().toISOString() };
     setMessages((m) => [...m, userMsg]);
     setInput('');
     setStreaming(true);
     setShowMentions(false);
-    let acc = '';
-    const fileSnippets: string[] = await getSelectedFileSnippets();
-    const res = await fetch(`${CORE_URL}/api/chat/conversations/${cid}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: userMsg.content, model, fileSnippets }) });
-    const reader = (res.body as any)?.getReader?.();
-    const decoder = new TextDecoder();
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value);
-        // Expect SSE frames: lines starting with 'data:'
-        for (const line of text.split('\n')) {
-          if (line.startsWith('data:')) {
-            const data = line.slice(5).trim();
-            // token events are raw tokens, others are JSON
-            try {
-              const obj = JSON.parse(data);
-              if (obj && obj.messageId) {
-                // end event
-              }
-            } catch {
-              acc += data;
-              setMessages((m) => {
-                const base = m.filter((mm) => mm.role !== 'assistant' || mm.id !== -1);
-                return [...base, { id: -1, role: 'assistant', content: acc, created_at: new Date().toISOString() } as any];
-              });
-            }
-          }
-        }
-      }
-    }
-    setStreaming(false);
-    await openConvo(cid);
-    // Auto-generate title after first AI response
-    const convo = current || (convos.find((c) => c.id === cid) || null);
-    const hasTitle = !!convo?.title;
-    if (!hasTitle) {
-      const first = (acc || userMsg.content || '').trim().split(/\s+/).slice(0, 6).join(' ');
-      const suggested_title = first.replace(/[`#*_]/g, '').replace(/[\.,;:!-]+$/, '');
-      fetch(`${CORE_URL}/api/chat/conversations/${cid}/title`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ suggested_title }) }).catch(() => {});
-      void refreshConvos();
-    }
-  }
 
-  async function getSelectedFileSnippets(): Promise<string[]> {
-    const outs: string[] = [];
+    const attachments: { path: string; snippet?: string }[] = [];
     for (const p of selectedFiles) {
       try {
         const res = await fetch(`${CORE_URL}/api/files/content?path=${encodeURIComponent(p)}`);
         const data = await res.json();
-        if (data?.snippet) outs.push(`Path: ${p}\n\n${data.snippet}`);
+        if (data?.snippet) attachments.push({ path: p, snippet: data.snippet });
       } catch {}
     }
-    return outs;
+
+    let acc = '';
+    try {
+      const res = await fetch(`${CORE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMsg.content,
+          conversation_id: conversationId,
+          attachments: attachments.length > 0 ? attachments : undefined,
+        }),
+      });
+
+      const newConvId = res.headers.get('X-Conversation-Id');
+      if (newConvId && (!current || current.id !== newConvId)) {
+        const convo: Conversation = { id: newConvId, title: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), message_count: 0 };
+        setCurrent(convo);
+        void refreshConvos();
+      }
+
+      const reader = (res.body as any)?.getReader?.();
+      const decoder = new TextDecoder();
+      let currentEvent = '';
+
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              currentEvent = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (currentEvent === 'token') {
+                acc += data;
+                setMessages((m) => {
+                  const base = m.filter((mm) => mm.role !== 'assistant' || mm.id !== -1);
+                  return [...base, { id: -1, role: 'assistant', content: acc, created_at: new Date().toISOString() }];
+                });
+              } else if (currentEvent === 'start') {
+                // start event — could contain model info as JSON
+              } else if (currentEvent === 'end') {
+                // end event — finalize message
+              } else if (currentEvent === 'error') {
+                try {
+                  const err = JSON.parse(data);
+                  acc += `\n\n_Error: ${err.error || 'Stream interrupted'}_`;
+                } catch {
+                  acc += `\n\n_Error: ${data}_`;
+                }
+                setMessages((m) => {
+                  const base = m.filter((mm) => mm.role !== 'assistant' || mm.id !== -1);
+                  return [...base, { id: -1, role: 'assistant', content: acc, created_at: new Date().toISOString() }];
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      setMessages((m) => [...m, { id: -2, role: 'assistant', content: '_Failed to reach the server._', created_at: new Date().toISOString() }]);
+    }
+    setStreaming(false);
+    setSelectedFiles([]);
+    setSelectedTools([]);
+
+    if (acc && current && !current.title) {
+      void refreshConvos();
+    }
   }
 
-  const title = (c: Conversation) => c.title || `Chat #${c.id}`;
+  const title = (c: Conversation) => c.title || `Chat #${c.id.slice(0, 8)}`;
 
   return (
     <div className="flex h-full">
       <aside className="w-64 shrink-0 border-r border-white/10 p-3 space-y-2">
         <div className="flex gap-2">
           <button className="px-2 py-1 rounded bg-white/10 text-sm" onClick={newConvo} title="New chat (Ctrl/Cmd+N)">New Chat</button>
-          <select className="flex-1 bg-black/40 border border-white/10 rounded px-2 text-sm" value={model} onChange={(e) => setModel(e.target.value)}>
-            <option>gpt-4o-mini</option>
-            <option>claude-3-haiku</option>
-          </select>
         </div>
         <input placeholder="Search" className="w-full px-2 py-1 rounded bg-black/40 border border-white/10 text-sm" />
         <div className="space-y-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 160px)' }}>
           {convos.map((c) => (
             <div key={c.id} className={`group w-full text-left px-2 py-1 rounded hover:bg-white/10 ${current?.id === c.id ? 'bg-white/10' : ''} flex items-center justify-between`}>
-              <button onClick={() => openConvo(c.id)} className="flex-1 text-left">
+              <button onClick={() => selectConvo(c)} className="flex-1 text-left">
                 <div className="text-sm truncate">{title(c)}</div>
-                <div className="text-xs opacity-60">{c.model}</div>
+                <div className="text-xs opacity-60">{c.message_count} messages</div>
               </button>
               <div className="opacity-0 group-hover:opacity-100 flex gap-1 ml-2">
-                <button title="Rename" className="text-xs px-1 py-0.5 bg-white/10 rounded" onClick={async () => {
-                  const newTitle = prompt('Rename conversation', title(c) || '') || '';
-                  if (!newTitle) return;
-                  await fetch(`${CORE_URL}/api/chat/conversations/${c.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newTitle }) });
-                  void refreshConvos();
-                }}>✎</button>
                 <button title="Delete" className="text-xs px-1 py-0.5 bg-white/10 rounded" onClick={async () => {
                   if (!confirm('Delete this conversation?')) return;
                   await fetch(`${CORE_URL}/api/chat/conversations/${c.id}`, { method: 'DELETE' });
@@ -164,6 +178,9 @@ export default function ChatsPage() {
       </aside>
       <main className="flex-1 flex flex-col h-full">
         <div className="flex-1 overflow-auto p-4 space-y-3">
+          {messages.length === 0 && current && (
+            <div className="text-center py-12 opacity-40 text-sm">Start a conversation</div>
+          )}
           {messages.map((m) => (
             <div key={m.id} className={`max-w-3xl ${m.role === 'user' ? 'ml-auto text-right' : ''}`}>
               <div className={`inline-block px-3 py-2 rounded ${m.role === 'user' ? 'bg-white text-black' : 'bg-white/10'}`}>
@@ -240,7 +257,6 @@ export default function ChatsPage() {
               </div>
             )}
           </div>
-          <div className="text-xs opacity-60">Model: {model}</div>
         </div>
       </main>
     </div>
@@ -248,7 +264,6 @@ export default function ChatsPage() {
 }
 
 function MessageContent({ message }: { message: Message }) {
-  // Tool call display card
   if (message.role === 'tool') {
     return <ToolCard content={message.content} name={message.name || undefined} />;
   }
