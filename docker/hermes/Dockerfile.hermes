@@ -1,0 +1,7 @@
+FROM ghcr.io/nousresearch/hermes-agent:latest
+
+COPY config.yaml /root/.hermes/config.yaml
+
+EXPOSE 8642
+
+CMD ["hermes", "gateway", "--api-server"]
