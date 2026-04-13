@@ -19,6 +19,7 @@ from app.models.commerce import (
 from app.models.container import UserContainer
 from app.models.usage import UsageRecord
 from app.models.bookmark import Bookmark
+from app.models.session_search import SessionSearchIndex
 
 __all__ = [
     "User",
@@ -46,4 +47,5 @@ __all__ = [
     "UserContainer",
     "UsageRecord",
     "Bookmark",
+    "SessionSearchIndex",
 ]
