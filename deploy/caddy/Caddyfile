@@ -2,13 +2,17 @@
   email {$CADDY_EMAIL}
 }
 
-# Web UI
-http://{$PUBLIC_DOMAIN} {
-  reverse_proxy web:3000
-}
+{$PUBLIC_DOMAIN} {
+  handle /api/* {
+    reverse_proxy api:8000
+  }
 
-# Core API (optional direct access)
-http://api.{$PUBLIC_DOMAIN} {
-  reverse_proxy core:3001
+  handle /ws/* {
+    reverse_proxy api:8000
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
 }
 
