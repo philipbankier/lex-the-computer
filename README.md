@@ -2,22 +2,7 @@
 
 **Your personal AI cloud computer. One command to deploy.**
 
-Lex is an open-source, self-hosted AI assistant platform. Deploy it on any server and get a complete AI-powered workspace: chat, file management, automations, site hosting, a Skills marketplace, multi-channel access, and more.
-
-## Features
-
-- **AI Chat** — Multi-model conversations with streaming, personas, rules, and @ mentions
-- **File Manager** — Upload, browse, edit files with Monaco editor and web terminal
-- **Automations** — Cron-scheduled AI tasks with delivery to chat, email, or Telegram
-- **Site Hosting** — Create and publish websites with live preview and custom domains
-- **Space** — Personal domain with custom pages and API endpoints
-- **Skills** — Extensible AI capabilities with a community Hub marketplace
-- **Integrations** — Gmail, Calendar, Notion, Drive, Dropbox, Linear, GitHub
-- **Channels** — Access Lex from Telegram, email, Discord, or SMS
-- **Datasets** — Upload CSV/JSON, explore with SQL queries (DuckDB-powered)
-- **20 Themes** — From Midnight to Mint, dark and light
-- **BYOK** — Bring your own API keys for OpenAI, Anthropic, Google, and more
-- **Public API** — REST API with API key auth for programmatic access
+Lex is an open-source, self-hosted AI assistant — a FastAPI backend powered by an [OpenClaw](https://github.com/openclaw) agent harness, long-term memory via [Honcho](https://github.com/plastic-labs/honcho), and a Next.js frontend. Deploy it on any server with Docker.
 
 ## Quick Start
 
@@ -25,55 +10,66 @@ Lex is an open-source, self-hosted AI assistant platform. Deploy it on any serve
 git clone https://github.com/lex-the-computer/lex
 cd lex
 cp .env.example .env
-# Edit .env: set at least one AI provider key (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+# Edit .env: set ANTHROPIC_API_KEY (required) and any optional keys
 docker compose up -d
 # Visit http://localhost:3000
 ```
 
-See [SETUP.md](SETUP.md) for detailed self-hosting instructions.
+That's it. Caddy handles HTTPS automatically when `PUBLIC_DOMAIN` is set.
 
-## Tech Stack
+### Lite Mode (no Honcho memory layer)
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 15, React 19, Tailwind CSS 4, shadcn/ui patterns |
-| Backend | Node.js, Hono, Drizzle ORM |
-| Database | PostgreSQL, Redis, DuckDB (datasets) |
-| AI | LiteLLM Proxy (multi-model routing) |
-| Channels | Telegram (grammy), Discord (discord.js), Email, SMS (Twilio) |
-| Infrastructure | Docker Compose, Caddy (reverse proxy + auto TLS) |
+```bash
+docker compose -f docker-compose.yml -f docker-compose.lite.yml up -d
+```
 
 ## Architecture
 
 ```
 Docker Compose Stack
-├── Caddy (reverse proxy, HTTPS, wildcard certs)
-├── Lex App (Next.js + Hono API)
-│   ├── Web UI (chat, files, automations, sites, space, skills, settings)
-│   ├── API Server (REST endpoints, SSE streaming)
-│   └── Core Services (AI engine, scheduler, channel router)
-├── PostgreSQL
-├── Redis
-└── LiteLLM Proxy (multi-model routing)
+├── Caddy          — reverse proxy, auto-TLS (Let's Encrypt)
+├── web            — Next.js 15 frontend
+├── api            — FastAPI product API (Python)
+├── openclaw       — OpenClaw agent harness (WebSocket gateway)
+├── honcho-api     — Honcho memory API
+├── honcho-deriver — Honcho background deriver
+├── PostgreSQL     — primary database (pgvector enabled)
+└── Redis          — cache & pub/sub
 ```
 
-## Project Structure
+See [docs/V2-REFACTOR-PLAN.md](docs/V2-REFACTOR-PLAN.md) for the full V2 architecture and migration notes.
 
-```
-packages/
-├── web/          # Next.js frontend (App Router)
-├── core/         # Hono API server
-└── shared/       # Shared types & constants
-```
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Claude API key (also used by Honcho) |
+| `OPENCLAW_GATEWAY_TOKEN` | No | Auto-generated on first boot if empty |
+| `OPENAI_API_KEY` | No | OpenAI / Codex |
+| `OPENROUTER_API_KEY` | No | 200+ models via OpenRouter |
+| `GEMINI_API_KEY` | No | Honcho deriver summaries |
+| `PUBLIC_DOMAIN` | No | Your domain for Caddy HTTPS |
+| `CADDY_EMAIL` | No | Let's Encrypt registration email |
+
+See `.env.example` for the full list including channels, OAuth integrations, and commerce keys.
+
+## Features
+
+- **AI Chat** — streaming conversations with personas, rules, and @ mentions
+- **Automations** — cron-scheduled AI tasks delivered to chat, email, or Telegram
+- **File Manager** — upload, browse, edit files with Monaco editor and web terminal
+- **Channels** — access Lex from Telegram, Discord, email, or SMS
+- **Skills** — extensible AI capabilities
+- **BYOK** — bring your own API keys
 
 ## Development
 
 ```bash
 pnpm install
-pnpm dev          # Runs web (port 3000) + core (port 3001)
+pnpm dev   # web on :3000, api on :8000
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
