@@ -1,4 +1,5 @@
 from app.schemas.api_keys import *  # noqa: F401,F403
+from app.schemas.automations import *  # noqa: F401,F403
 from app.schemas.auth import *  # noqa: F401,F403
 from app.schemas.chat import *  # noqa: F401,F403
 from app.schemas.commerce import *  # noqa: F401,F403
