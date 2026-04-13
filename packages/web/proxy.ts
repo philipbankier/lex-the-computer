@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/onboarding', '/api/health', '/api/auth'];
 
-export function middleware(req: NextRequest) {
+export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const session = req.cookies.get('lex_session');
@@ -18,4 +18,3 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ['/((?!_next|static|favicon.ico).*)'],
 };
-

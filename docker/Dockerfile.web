@@ -30,7 +30,8 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/packages/web/.next/standalone ./
 COPY --from=builder /app/packages/web/.next/static ./packages/web/.next/static
-COPY --from=builder /app/packages/web/public ./packages/web/public
+# public/ may not exist — copy only if present
+COPY --from=builder /app/packages/web/public* ./packages/web/
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
     CMD node -e "fetch('http://localhost:3000').then(r=>{if(!r.ok)throw r.status}).catch(()=>process.exit(1))"

@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // typedRoutes disabled: tab system uses dynamic paths
+  output: 'standalone',
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000'],
