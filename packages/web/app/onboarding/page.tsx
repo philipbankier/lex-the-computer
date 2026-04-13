@@ -19,18 +19,26 @@ const AUTOMATION_OPTIONS = [
   { id: 'monitor', icon: '🔔', name: 'Website monitor', placeholder: 'URL to watch', instruction: (v: string) => `Monitor this website for changes and alert me: ${v}` },
 ];
 
+const MEMORY_OPTIONS = [
+  { id: 'honcho', name: 'Deep Memory', description: 'Learns from conversations over time using Honcho. Builds a rich profile of your preferences and context.', icon: '🧠' },
+  { id: 'core', name: 'Light Memory', description: 'Basic conversation context within sessions. No long-term learning between conversations.', icon: '💡' },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [animating, setAnimating] = useState(false);
 
-  // Step 2: Profile
+  // Step 1: Profile
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [interestInput, setInterestInput] = useState('');
   const [showSocial, setShowSocial] = useState(false);
   const [socialLinks, setSocialLinks] = useState({ twitter: '', github: '', linkedin: '', website: '' });
+
+  // Step 2: Memory
+  const [memoryProvider, setMemoryProvider] = useState('honcho');
 
   // Step 3: Persona
   const [selectedPersona, setSelectedPersona] = useState(0);
@@ -41,6 +49,10 @@ export default function OnboardingPage() {
   const [automationInput, setAutomationInput] = useState('');
   const [delivery, setDelivery] = useState('chat');
   const [scheduleTime, setScheduleTime] = useState('08:00');
+
+  // Step 5: Channels
+  const [telegramToken, setTelegramToken] = useState('');
+  const [telegramUserId, setTelegramUserId] = useState('');
 
   const goNext = useCallback(() => {
     setAnimating(true);
@@ -57,6 +69,15 @@ export default function OnboardingPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ displayName, bio, interests, socialLinks }),
+    });
+    goNext();
+  }
+
+  async function saveMemory() {
+    await fetch(`${CORE_URL}/api/onboarding/memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: memoryProvider }),
     });
     goNext();
   }
@@ -89,6 +110,20 @@ export default function OnboardingPage() {
           }),
         });
       }
+    }
+    goNext();
+  }
+
+  async function saveChannels() {
+    if (telegramToken.trim()) {
+      await fetch(`${CORE_URL}/api/onboarding/channels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_bot_token: telegramToken || undefined,
+          telegram_user_id: telegramUserId ? Number(telegramUserId) : undefined,
+        }),
+      });
     }
     goNext();
   }
@@ -181,8 +216,36 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 2: Persona */}
+        {/* Step 2: Memory Provider */}
         {step === 2 && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl font-semibold">Choose your memory mode</h2>
+              <p className="text-sm opacity-60 mt-1">This determines how Lex remembers your conversations</p>
+            </div>
+            <div className="space-y-3">
+              {MEMORY_OPTIONS.map((opt) => (
+                <button key={opt.id} onClick={() => setMemoryProvider(opt.id)}
+                  className={`w-full text-left p-4 rounded-lg border transition ${memoryProvider === opt.id ? 'border-white bg-white/10' : 'border-white/10 hover:border-white/30'}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{opt.icon}</span>
+                    <div>
+                      <div className="font-medium">{opt.name}</div>
+                      <div className="text-sm opacity-60 mt-0.5">{opt.description}</div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between pt-2">
+              <button onClick={goBack} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 transition">Back</button>
+              <button onClick={saveMemory} className="px-6 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition">Continue</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Persona */}
+        {step === 3 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-semibold">Choose your AI's personality</h2>
@@ -210,8 +273,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 3: First Automation */}
-        {step === 3 && (
+        {/* Step 4: First Automation */}
+        {step === 4 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-semibold">Set up your first automation</h2>
@@ -256,29 +319,36 @@ export default function OnboardingPage() {
                   <button onClick={goNext} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 transition text-sm">Skip for now</button>
                 )}
                 <button onClick={saveAutomation} className="px-6 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition">
-                  {selectedAutomation ? 'Continue' : 'Continue'}
+                  Continue
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 4: Channels */}
-        {step === 4 && (
+        {/* Step 5: Channels */}
+        {step === 5 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-semibold">Connect channels</h2>
               <p className="text-sm opacity-60 mt-1">Access Lex from anywhere</p>
             </div>
             <div className="space-y-3">
-              <div className="p-3 rounded-lg border border-white/10">
+              <div className="p-4 rounded-lg border border-white/10 space-y-3">
                 <div className="flex items-center gap-3">
                   <span className="text-lg">✈️</span>
                   <div className="flex-1">
                     <div className="font-medium text-sm">Telegram</div>
                     <div className="text-xs opacity-60">Chat with your AI via Telegram</div>
                   </div>
-                  <span className="px-2 py-1 text-xs rounded bg-white/10 opacity-60">Configure in Settings</span>
+                </div>
+                <div className="space-y-2 ml-8">
+                  <input value={telegramToken} onChange={(e) => setTelegramToken(e.target.value)}
+                    placeholder="Bot token (from @BotFather)"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm outline-none" />
+                  <input value={telegramUserId} onChange={(e) => setTelegramUserId(e.target.value)}
+                    placeholder="Your Telegram user ID (optional)"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm outline-none" />
                 </div>
               </div>
               <div className="p-3 rounded-lg border border-white/10">
@@ -304,13 +374,20 @@ export default function OnboardingPage() {
             </div>
             <div className="flex justify-between pt-2">
               <button onClick={goBack} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 transition">Back</button>
-              <button onClick={goNext} className="px-6 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition">Continue</button>
+              <div className="flex gap-2">
+                {!telegramToken && (
+                  <button onClick={goNext} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 transition text-sm">Skip</button>
+                )}
+                <button onClick={saveChannels} className="px-6 py-2 rounded-lg bg-white text-black font-medium hover:bg-white/90 transition">
+                  {telegramToken ? 'Save & Continue' : 'Continue'}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Step 5: Ready! */}
-        {step === 5 && (
+        {/* Step 6: Ready! */}
+        {step === 6 && (
           <div className="text-center space-y-6">
             <div className="text-5xl">🖥️</div>
             <h2 className="text-2xl font-semibold">Your computer is ready!</h2>
@@ -333,9 +410,9 @@ export default function OnboardingPage() {
         )}
 
         {/* Step indicator */}
-        {step > 0 && step < 5 && (
+        {step > 0 && step < 6 && (
           <div className="flex justify-center gap-1.5 mt-8">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <div key={s} className={`w-2 h-2 rounded-full transition ${step >= s ? 'bg-white' : 'bg-white/20'}`} />
             ))}
           </div>

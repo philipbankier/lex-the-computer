@@ -42,7 +42,7 @@ export default function DashboardPage() {
       setProfile(pRes);
       setConversations((cRes.conversations || cRes || []).slice(0, 5));
       const autos = aRes.automations || aRes || [];
-      setAutomations(autos.filter((a: any) => a.is_active).slice(0, 3));
+      setAutomations(autos.filter((a: any) => a.enabled ?? a.is_active).slice(0, 3));
       // Try to get runs
       try {
         const sRes = await fetch(`${CORE_URL}/api/system/stats`).then((r) => r.json());

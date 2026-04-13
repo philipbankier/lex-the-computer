@@ -4,46 +4,48 @@ import { parseCronToHuman } from '@/lib/cron';
 
 const CORE_URL = process.env.NEXT_PUBLIC_CORE_URL || 'http://localhost:8000';
 
-type Automation = { id: number; name: string; instruction: string; schedule: string; is_active: boolean; delivery?: string; last_run?: string | null; model?: string };
+type Automation = { id: string; name: string; instruction: string; schedule: string; enabled: boolean; delivery: string; created_at: string | null; updated_at: string | null };
 
 export default function AutomationsShell() {
   const [list, setList] = useState<Automation[]>([]);
   const [filter, setFilter] = useState<'None' | 'Email' | 'SMS' | 'Telegram' | 'Paused'>('None');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<{ id?: number; name: string; instruction: string; schedule: string; delivery: string; model?: string }>({ name: '', instruction: '', schedule: '0 9 * * *', delivery: 'chat' });
+  const [form, setForm] = useState<{ id?: string; name: string; instruction: string; schedule: string; delivery: string }>({ name: '', instruction: '', schedule: '0 9 * * *', delivery: 'chat' });
 
   async function refresh() {
-    const r = await fetch(`${CORE_URL}/api/agents`);
+    const r = await fetch(`${CORE_URL}/api/automations`);
     const j = await r.json();
     setList(j || []);
   }
   useEffect(() => { void refresh(); }, []);
 
   function openNew() { setForm({ name: '', instruction: '', schedule: '0 9 * * *', delivery: 'chat' }); setShowForm(true); }
-  function openEdit(a: Automation) { setForm({ id: a.id, name: a.name, instruction: a.instruction, schedule: a.schedule, delivery: a.delivery || 'chat', model: a.model }); setShowForm(true); }
+  function openEdit(a: Automation) { setForm({ id: a.id, name: a.name, instruction: a.instruction, schedule: a.schedule, delivery: a.delivery || 'chat' }); setShowForm(true); }
 
   async function save() {
     if (form.id) {
-      await fetch(`${CORE_URL}/api/agents/${form.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, instruction: form.instruction, schedule: form.schedule, delivery_method: form.delivery, model: form.model }) });
+      await fetch(`${CORE_URL}/api/automations/${form.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, instruction: form.instruction, schedule: form.schedule, delivery: form.delivery }) });
     } else {
-      await fetch(`${CORE_URL}/api/agents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, instruction: form.instruction, schedule: form.schedule, delivery_method: form.delivery, model: form.model }) });
+      await fetch(`${CORE_URL}/api/automations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, instruction: form.instruction, schedule: form.schedule, delivery: form.delivery }) });
     }
     setShowForm(false);
     await refresh();
   }
 
   async function toggle(a: Automation) {
-    await fetch(`${CORE_URL}/api/agents/${a.id}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !a.is_active }) });
+    await fetch(`${CORE_URL}/api/automations/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !a.enabled }) });
     await refresh();
   }
 
-  async function runNow(a: Automation) {
-    await fetch(`${CORE_URL}/api/agents/${a.id}/run`, { method: 'POST' });
+  async function remove(a: Automation) {
+    if (!confirm(`Delete automation "${a.name}"?`)) return;
+    await fetch(`${CORE_URL}/api/automations/${a.id}`, { method: 'DELETE' });
+    await refresh();
   }
 
   const tabs: typeof filter[] = ['None', 'Email', 'SMS', 'Telegram', 'Paused'];
   const filtered = list.filter((a) => {
-    if (filter === 'Paused') return !a.is_active;
+    if (filter === 'Paused') return !a.enabled;
     if (filter === 'None') return true;
     const dm = (a.delivery || 'chat').toLowerCase();
     return dm === filter.toLowerCase();
@@ -65,15 +67,15 @@ export default function AutomationsShell() {
             <div className="flex items-center justify-between">
               <div className="font-medium">{a.name}</div>
               <div className="flex items-center gap-2">
-                <span className={`text-xs px-2 py-0.5 rounded ${a.is_active ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{a.is_active ? 'Active' : 'Paused'}</span>
-                <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={() => toggle(a)}>{a.is_active ? 'Pause' : 'Activate'}</button>
+                <span className={`text-xs px-2 py-0.5 rounded ${a.enabled ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{a.enabled ? 'Active' : 'Paused'}</span>
+                <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={() => toggle(a)}>{a.enabled ? 'Pause' : 'Activate'}</button>
               </div>
             </div>
             <div className="text-sm opacity-80">{parseCronToHuman(a.schedule)}</div>
-            <div className="text-xs opacity-60">Delivery: {a.delivery || 'chat'} · Last run: {a.last_run ? new Date(a.last_run).toLocaleString() : '—'}</div>
+            <div className="text-xs opacity-60">Delivery: {a.delivery || 'chat'}</div>
             <div className="flex gap-2">
               <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={() => openEdit(a)}>Edit</button>
-              <button className="text-xs px-2 py-1 bg-white/10 rounded" onClick={() => runNow(a)}>Run Now</button>
+              <button className="text-xs px-2 py-1 bg-red-600/40 rounded" onClick={() => remove(a)}>Delete</button>
             </div>
           </div>
         ))}
@@ -101,19 +103,13 @@ export default function AutomationsShell() {
               </div>
               <div className="text-xs opacity-60">{parseCronToHuman(form.schedule)}</div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="space-y-1 flex-1">
-                <div className="text-sm">Delivery</div>
-                <select className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded" value={form.delivery} onChange={(e) => setForm({ ...form, delivery: e.target.value })}>
-                  <option value="chat">Chat</option>
-                  <option value="email">Email</option>
-                  <option value="telegram">Telegram</option>
-                </select>
-              </div>
-              <div className="space-y-1 flex-1">
-                <div className="text-sm">Model (optional)</div>
-                <input className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded" placeholder="gpt-4o-mini" value={form.model || ''} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-              </div>
+            <div className="space-y-1">
+              <div className="text-sm">Delivery</div>
+              <select className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded" value={form.delivery} onChange={(e) => setForm({ ...form, delivery: e.target.value })}>
+                <option value="chat">Chat</option>
+                <option value="email">Email</option>
+                <option value="telegram">Telegram</option>
+              </select>
             </div>
             <div className="flex justify-end gap-2">
               <button className="px-3 py-1.5 bg-white/10 rounded" onClick={() => setShowForm(false)}>Cancel</button>

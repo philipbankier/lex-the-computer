@@ -8,51 +8,66 @@ type Message = { id: number; role: 'user' | 'assistant' | 'system' | 'tool'; con
 
 export function ChatSidebar() {
   const { chatCollapsed, setChatCollapsed } = useTabs();
-  const [convoId, setConvoId] = useState<number | null>(null);
+  const [convoId, setConvoId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [model, setModel] = useState('gpt-4o-mini');
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streaming]);
 
-  async function ensureConvo() {
-    if (convoId) return convoId;
-    const res = await fetch(`${CORE_URL}/api/chat/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, title: 'Sidebar Chat' }) });
-    const convo = await res.json();
-    setConvoId(convo.id);
-    return convo.id as number;
-  }
-
   async function send() {
-    const cid = await ensureConvo();
-    const userMsg: Message = { id: Date.now(), role: 'user', content: input } as any;
+    const userMsg: Message = { id: Date.now(), role: 'user', content: input };
     setMessages((m) => [...m, userMsg]);
     setInput('');
     setStreaming(true);
     let acc = '';
-    const res = await fetch(`${CORE_URL}/api/chat/conversations/${cid}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: userMsg.content, model }) });
-    const reader = (res.body as any)?.getReader?.();
-    const decoder = new TextDecoder();
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value);
-        for (const line of text.split('\n')) {
-          if (line.startsWith('data:')) {
-            const data = line.slice(5).trim();
-            try { JSON.parse(data); } catch {
-              acc += data;
-              setMessages((m) => {
-                const base = m.filter((mm) => mm.role !== 'assistant' || mm.id !== -1);
-                return [...base, { id: -1, role: 'assistant', content: acc } as any];
-              });
+
+    try {
+      const res = await fetch(`${CORE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMsg.content,
+          conversation_id: convoId,
+        }),
+      });
+
+      const newConvId = res.headers.get('X-Conversation-Id');
+      if (newConvId) setConvoId(newConvId);
+
+      const reader = (res.body as any)?.getReader?.();
+      const decoder = new TextDecoder();
+      let currentEvent = '';
+
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              currentEvent = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (currentEvent === 'token') {
+                acc += data;
+                setMessages((m) => {
+                  const base = m.filter((mm) => mm.role !== 'assistant' || mm.id !== -1);
+                  return [...base, { id: -1, role: 'assistant', content: acc }];
+                });
+              }
             }
           }
         }
       }
+    } catch {
+      setMessages((m) => [...m, { id: -2, role: 'assistant', content: '_Failed to reach the server._' }]);
     }
     setStreaming(false);
   }
@@ -75,10 +90,6 @@ export function ChatSidebar() {
       </div>
       <div className="space-y-2">
         <div className="text-sm opacity-80">Mini chat</div>
-        <select className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-sm" value={model} onChange={(e) => setModel(e.target.value)}>
-          <option>gpt-4o-mini</option>
-          <option>claude-3-haiku</option>
-        </select>
       </div>
       <div className="flex-1 rounded bg-black/20 border border-white/10 p-2 overflow-auto space-y-2">
         {messages.map((m) => (
