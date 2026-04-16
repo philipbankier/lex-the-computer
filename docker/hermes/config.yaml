@@ -1,7 +1,11 @@
-# Hermes Agent — default Lex configuration
+# Hermes Agent — default Lex configuration for Z.ai GLM 5.1
 # Overrides via environment variables take precedence.
 
-model: claude-sonnet-4-6
+model: glm-5.1
+
+# Custom API base for Z.ai (OpenAI-compatible endpoint)
+# Can be overridden by ZAI_API_BASE env var
+api_base: https://open.bigmodel.cn/api/paas/v4
 
 terminal:
   backend: docker

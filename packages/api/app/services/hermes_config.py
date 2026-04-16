@@ -12,8 +12,8 @@ import yaml
 
 
 def generate_hermes_config(
-    model: str = "claude-sonnet-4-6",
-    provider: str = "anthropic",
+    model: str = "glm-5.1",
+    provider: str = "zai",
     api_key: str = "",
     memory_provider: str = "core",
     terminal_backend: str = "docker",
@@ -23,6 +23,7 @@ def generate_hermes_config(
     workspace_dir: str = "/data/workspace",
     api_server_key: str = "lex-local-dev",
     api_server_port: int = 8642,
+    api_base: str | None = None,
 ) -> dict[str, Any]:
     """Generate Hermes config.yaml content and .env values.
 
@@ -48,6 +49,10 @@ def generate_hermes_config(
             "port": api_server_port,
         },
     }
+
+    # Add custom API base for Z.ai or other OpenAI-compatible providers
+    if api_base:
+        config["api_base"] = api_base
 
     if memory_provider == "honcho":
         config["plugins"] = {
@@ -80,8 +85,11 @@ def generate_hermes_config(
             "anthropic": "ANTHROPIC_API_KEY",
             "openai": "OPENAI_API_KEY",
             "openrouter": "OPENROUTER_API_KEY",
+            "zai": "ZAI_API_KEY",
         }.get(provider, f"{provider.upper()}_API_KEY")
         env[env_key] = api_key
+        if api_base:
+            env["API_BASE"] = api_base
     env["API_SERVER_KEY"] = api_server_key
     if telegram_bot_token:
         env["TELEGRAM_BOT_TOKEN"] = telegram_bot_token
