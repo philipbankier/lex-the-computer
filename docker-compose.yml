@@ -32,7 +32,7 @@ services:
     env_file: .env
     environment:
       - AGENT_HARNESS=${AGENT_HARNESS:-hermes}
-      - HERMES_API_URL=http://hermes:8642
+      - HERMES_API_URL=${HERMES_API_URL:-http://hermes:8642}
       - HERMES_API_KEY=${HERMES_API_KEY:-lex-local-dev}
       - HERMES_DATA_DIR=/data/hermes
       - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/lex
@@ -42,12 +42,12 @@ services:
     volumes:
       - workspace:/data/workspace
       - hermes_data:/data/hermes:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      hermes:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
@@ -118,7 +118,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: lex
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
@@ -132,7 +132,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
