@@ -14,7 +14,7 @@ class TestGenerateHermesConfig:
     def test_default_config(self):
         result = generate_hermes_config()
         config = result["config"]
-        assert config["model"] == "claude-sonnet-4-6"
+        assert config["model"] == "glm-5.1"
         assert config["terminal"]["backend"] == "docker"
         assert config["terminal"]["cwd"] == "/data/workspace"
         assert config["api_server"]["enabled"] is True
